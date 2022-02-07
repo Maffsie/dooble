@@ -3,9 +3,11 @@
 #ifndef dooble_gemini_h
 #define dooble_gemini_h
 
+#include <QAbstractSocket>
 #include <QBuffer>
 #include <QPointer>
-#include <QTcpSocket>
+#include <QSslConfiguration>
+#include <QSslSocket>
 #include <QUrl>
 #include <QWebEngineUrlRequestJob>
 #include <QWebEngineUrlSchemeHandler>
@@ -30,7 +32,7 @@ class dooble_gemini: public QWebEngineUrlSchemeHandler
 		     bool is_image);
 };
 
-class dooble_gemini_implementation: public QTcpSocket
+class dooble_gemini_implementation: public QSslSocket
 {
   Q_OBJECT
 
@@ -53,13 +55,20 @@ class dooble_gemini_implementation: public QTcpSocket
   bool m_is_image;
   char m_item_type;
   int m_seven_count;
+  QByteArray m_header;
+  int m_status_code;
+  QString m_meta;
   static QByteArray plain_to_html(const QByteArray &bytes);
 
  private slots:
   void slot_connected(void);
+  void slot_encrypted(void);
   void slot_disconnected(void);
   void slot_ready_read(void);
   void slot_write_timeout(void);
+  void slot_statechange(QAbstractSocket::SocketState state);
+  void slot_peerverifyerror(QSslError err);
+  void slot_sslerrors(const QList<QSslError> &errs);
 
  signals:
   void error(QWebEngineUrlRequestJob::Error error);

@@ -108,8 +108,9 @@ void dooble_gemini::slot_finished(const QByteArray &bytes,
 dooble_gemini_implementation::dooble_gemini_implementation
 (const QUrl &url,
  dooble_web_engine_view *web_engine_view,
- QObject *parent):QTcpSocket(parent)
+ QObject *parent): QSslSocket(parent)
 {
+  qDebug() << "Connect begin";
   m_content_type_supported = true;
   m_web_engine_view = web_engine_view;
   m_is_image = false;
@@ -120,24 +121,46 @@ dooble_gemini_implementation::dooble_gemini_implementation
   if(m_url.port() == -1)
     m_url.setPort(1965);
 
+  auto qsc = sslConfiguration();
+  qsc.setProtocol(QSsl::TlsV1_2OrLater);
+  qsc.setCaCertificates(QList<QSslCertificate> {});
+  //qsc.setCaCertificates(QSslConfiguration::systemCaCertificates());
+  setSslConfiguration(qsc);
+
   m_write_timer.setSingleShot(true);
   connect(&m_write_timer,
 	  SIGNAL(timeout(void)),
 	  this,
-	  SLOT(slot_write_timeout(void)));
+      SLOT(slot_write_timeout(void)));
   connect(this,
-	  SIGNAL(connected(void)),
-	  this,
-	  SLOT(slot_connected(void)));
+      SIGNAL(connected(void)),
+      this,
+      SLOT(slot_connected(void)));
   connect(this,
-	  SIGNAL(disconnected(void)),
-	  this,
-	  SLOT(slot_disconnected(void)));
+      SIGNAL(encrypted(void)),
+      this,
+      SLOT(slot_encrypted(void)));
+  connect(this,
+      SIGNAL(disconnected(void)),
+      this,
+      SLOT(slot_disconnected(void)));
+  connect(this,
+      SIGNAL(stateChanged(QAbstractSocket::SocketState)),
+      this,
+      SLOT(slot_statechange(QAbstractSocket::SocketState)));
   connect(this,
 	  SIGNAL(readyRead(void)),
 	  this,
 	  SLOT(slot_ready_read(void)));
-  connectToHost(m_url.host(), static_cast<quint16> (m_url.port()));
+  connect(this,
+          SIGNAL(sslErrors(const QList<QSslError> &)),
+          this,
+          SLOT(slot_sslerrors(const QList<QSslError> &)));
+  connect(this,
+          SIGNAL(peerVerifyError(QSslError)),
+          this,
+          SLOT(slot_peerverifyerror(QSslError)));
+  connectToHostEncrypted(m_url.host(), static_cast<quint16> (m_url.port()));
 }
 
 dooble_gemini_implementation::~dooble_gemini_implementation()
@@ -157,6 +180,14 @@ QByteArray dooble_gemini_implementation::plain_to_html(const QByteArray &bytes)
 
 void dooble_gemini_implementation::slot_connected(void)
 {
+    qDebug() << "SIG: Connected";
+    waitForEncrypted(1000);
+    qDebug() << ".....waited for encrypted.";
+}
+
+void dooble_gemini_implementation::slot_encrypted(void)
+{
+    qDebug() << "SIG: Encrypted";
   QString output("");
   auto scheme(m_url.scheme());
   auto host(m_url.host());
@@ -173,13 +204,10 @@ void dooble_gemini_implementation::slot_connected(void)
   output.append(host);
   if(path.length() <= 1)
     {
-      m_item_type = '1';
       output.append("/");
     }
   else
     {
-      m_item_type = path.at(1).toLatin1();
-      path.remove(1, 1);
       output.append(path);
      }
 
@@ -190,6 +218,7 @@ void dooble_gemini_implementation::slot_connected(void)
     }
 
   output.append("\r\n");
+  qDebug() << output;
   m_output = output;
   m_web_engine_view->page()->runJavaScript
     ("if(document.getElementById(\"input_value\") != null)"
@@ -198,18 +227,25 @@ void dooble_gemini_implementation::slot_connected(void)
      {
        m_search = result.toString();
      });
-  m_write_timer.start(500);
+  m_write_timer.start(1500);
 }
 
 void dooble_gemini_implementation::slot_disconnected(void)
 {
+    qDebug() << "SIG: Disconnected";
   emit finished(m_html, m_content_type_supported, m_is_image);
 }
 
 void dooble_gemini_implementation::slot_ready_read(void)
 {
+    qDebug() << "SIG: ReadyRead";
   while(bytesAvailable() > 0)
     m_content.append(readAll());
+
+  auto bytes(m_content.mid(0, m_content.indexOf(s_eol) + 1));
+  m_header = bytes;
+  m_content.remove(0, m_header.length());
+  qDebug() << m_header;
 
   if(m_item_type == '0') /* Plaintext */
     {
@@ -258,7 +294,7 @@ void dooble_gemini_implementation::slot_ready_read(void)
 
       while(m_content.contains(s_eol))
 	{
-	  auto bytes(m_content.mid(0, m_content.indexOf(s_eol) + 1));
+      auto bytes(m_content.mid(0, m_content.indexOf(s_eol) + 1));
 
 	  m_content.remove(0, bytes.length());
 	  bytes = bytes.trimmed();
@@ -371,9 +407,31 @@ void dooble_gemini_implementation::slot_ready_read(void)
 
 void dooble_gemini_implementation::slot_write_timeout(void)
 {
+    qDebug() << "SIG: WriteTimeout";
   if(m_search.isEmpty())
     write(m_output.toUtf8().append(s_eol));
   else
     write
       (m_output.toUtf8().append("?").append(m_search.toUtf8()).append(s_eol));
+}
+
+void dooble_gemini_implementation::slot_statechange(QAbstractSocket::SocketState state)
+{
+    qDebug() << "StateChange:" << state;
+    qDebug() << "ErrorString (if any):" << errorString();
+    qDebug() << "HandshakeErrors (if any):" << sslHandshakeErrors();
+}
+
+void dooble_gemini_implementation::slot_peerverifyerror(QSslError err)
+{
+    qDebug() << "SIG: PeerVerifyError";
+    qDebug() << "PeerVerifyError:" << err;
+    ignoreSslErrors(QList<QSslError> {err});
+}
+
+void dooble_gemini_implementation::slot_sslerrors(const QList<QSslError> &errs)
+{
+    qDebug() << "SIG: SSLErrors";
+    qDebug() << "SSLError:" << errs;
+    ignoreSslErrors(errs);
 }
