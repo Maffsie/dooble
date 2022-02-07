@@ -158,9 +158,19 @@ QByteArray dooble_gemini_implementation::plain_to_html(const QByteArray &bytes)
 void dooble_gemini_implementation::slot_connected(void)
 {
   QString output("");
+  auto scheme(m_url.scheme());
+  auto host(m_url.host());
   auto path(m_url.path());
   auto query(m_url.query());
 
+  // Gemini spec indicates that a request URL may either be a relative path
+  //  OR an absolute path, including scheme.
+  // Relative path is simpler to implement, but absolute path permits
+  //  server-side vhost identification (along with SNI) and server-side proxying
+  //  although this -could- be a preference?
+  output.append(scheme);
+  output.append("://");
+  output.append(host);
   if(path.length() <= 1)
     {
       m_item_type = '1';
@@ -179,6 +189,7 @@ void dooble_gemini_implementation::slot_connected(void)
       output.append(query);
     }
 
+  output.append("\r\n");
   m_output = output;
   m_web_engine_view->page()->runJavaScript
     ("if(document.getElementById(\"input_value\") != null)"
