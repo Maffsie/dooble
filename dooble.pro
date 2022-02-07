@@ -216,7 +216,8 @@ DEFINES         += DOOBLE_MMAN_PRESENT
 }
 
 CONFIG		+= qt release warn_on
-DEFINES         += QT_DEPRECATED_WARNINGS
+DEFINES         += QT_DEPRECATED_WARNINGS \
+                   DOOBLE_REGISTER_GEMINI_SCHEME
 LANGUAGE	= C++
 QT		+= concurrent \
                    gui \
