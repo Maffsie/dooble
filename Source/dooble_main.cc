@@ -34,6 +34,8 @@
 #if (QT_VERSION >= QT_VERSION_CHECK(5, 12, 0))
 #ifdef DOOBLE_REGISTER_GOPHER_SCHEME
 #include <QWebEngineUrlScheme>
+#elif DOOBLE_REGISTER_GEMINI_SCHEME
+#include <QWebEngineUrlScheme>
 #endif
 #endif
 
@@ -204,10 +206,9 @@ int main(int argc, char *argv[])
   QWebEngineUrlScheme gemScheme("gemini");
 
   gemScheme.setDefaultPort(1965);
-  // Gemini requires TLS1.2 at bare minimum.
   gemScheme.setFlags(QWebEngineUrlScheme::ViewSourceAllowed | QWebEngineUrlScheme::SecureScheme);
   gemScheme.setSyntax(QWebEngineUrlScheme::Syntax::HostAndPort);
-  QWebEngineUrlScheme::registerScheme(scheme);
+  QWebEngineUrlScheme::registerScheme(gemScheme);
 #endif
 #ifdef DOOBLE_REGISTER_GOPHER_SCHEME
   QWebEngineUrlScheme gophScheme("gopher");

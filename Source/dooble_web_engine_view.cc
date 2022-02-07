@@ -106,6 +106,7 @@ dooble_web_engine_view::dooble_web_engine_view
   if(!m_page->profile()->urlSchemeHandler("gemini"))
     m_page->profile()->installUrlSchemeHandler
       ("gemini", new dooble_gemini(this));
+
   if(!m_page->profile()->urlSchemeHandler("gopher"))
     m_page->profile()->installUrlSchemeHandler
       ("gopher", new dooble_gopher(this));

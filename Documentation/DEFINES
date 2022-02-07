@@ -19,6 +19,10 @@ DOOBLE_QTCHARTS_PRESENT
 
 Enabled if the QtCharts module is available.
 
+DOOBLE_REGISTER_GEMINI_SCHEME
+
+Force registration of Gemini scheme.
+
 DOOBLE_REGISTER_GOPHER_SCHEME
 
 Force registration of Gopher scheme.
