@@ -200,6 +200,14 @@ int main(int argc, char *argv[])
 #endif
 #endif
 #if (QT_VERSION >= QT_VERSION_CHECK(5, 12, 0))
+#ifdef DOOBLE_REGISTER_GEMINI_SCHEME
+  QWebEngineUrlScheme scheme("gemini");
+
+  scheme.setDefaultPort(1965);
+  scheme.setFlags(QWebEngineUrlScheme::ViewSourceAllowed);
+  scheme.setSyntax(QWebEngineUrlScheme::Syntax::HostAndPort);
+  QWebEngineUrlScheme::registerScheme(scheme);
+#endif
 #ifdef DOOBLE_REGISTER_GOPHER_SCHEME
   QWebEngineUrlScheme scheme("gopher");
 

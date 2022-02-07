@@ -170,6 +170,7 @@ bool dooble_ui_utilities::allowed_scheme(const QUrl &url)
 
   return scheme == "file" ||
     scheme == "ftp" ||
+    scheme == "gemini" ||
     scheme == "gopher" ||
     scheme == "http" ||
     scheme == "https" ||
