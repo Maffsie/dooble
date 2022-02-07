@@ -201,20 +201,21 @@ int main(int argc, char *argv[])
 #endif
 #if (QT_VERSION >= QT_VERSION_CHECK(5, 12, 0))
 #ifdef DOOBLE_REGISTER_GEMINI_SCHEME
-  QWebEngineUrlScheme scheme("gemini");
+  QWebEngineUrlScheme gemScheme("gemini");
 
-  scheme.setDefaultPort(1965);
-  scheme.setFlags(QWebEngineUrlScheme::ViewSourceAllowed);
-  scheme.setSyntax(QWebEngineUrlScheme::Syntax::HostAndPort);
+  gemScheme.setDefaultPort(1965);
+  // Gemini requires TLS1.2 at bare minimum.
+  gemScheme.setFlags(QWebEngineUrlScheme::ViewSourceAllowed | QWebEngineUrlScheme::SecureScheme);
+  gemScheme.setSyntax(QWebEngineUrlScheme::Syntax::HostAndPort);
   QWebEngineUrlScheme::registerScheme(scheme);
 #endif
 #ifdef DOOBLE_REGISTER_GOPHER_SCHEME
-  QWebEngineUrlScheme scheme("gopher");
+  QWebEngineUrlScheme gophScheme("gopher");
 
-  scheme.setDefaultPort(70);
-  scheme.setFlags(QWebEngineUrlScheme::ViewSourceAllowed);
-  scheme.setSyntax(QWebEngineUrlScheme::Syntax::HostAndPort);
-  QWebEngineUrlScheme::registerScheme(scheme);
+  gophScheme.setDefaultPort(70);
+  gophScheme.setFlags(QWebEngineUrlScheme::ViewSourceAllowed);
+  gophScheme.setSyntax(QWebEngineUrlScheme::Syntax::HostAndPort);
+  QWebEngineUrlScheme::registerScheme(gophScheme);
 #endif
 #endif
 
