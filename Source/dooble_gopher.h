@@ -82,7 +82,7 @@ class dooble_gopher_implementation: public QTcpSocket
 
  private slots:
   void slot_connected(void);
-  void slot_disonnected(void);
+  void slot_disconnected(void);
   void slot_ready_read(void);
   void slot_write_timeout(void);
 

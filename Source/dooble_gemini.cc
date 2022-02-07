@@ -132,7 +132,7 @@ dooble_gemini_implementation::dooble_gemini_implementation
   connect(this,
 	  SIGNAL(disconnected(void)),
 	  this,
-	  SLOT(slot_disonnected(void)));
+	  SLOT(slot_disconnected(void)));
   connect(this,
 	  SIGNAL(readyRead(void)),
 	  this,
@@ -201,7 +201,7 @@ void dooble_gemini_implementation::slot_connected(void)
   m_write_timer.start(500);
 }
 
-void dooble_gemini_implementation::slot_disonnected(void)
+void dooble_gemini_implementation::slot_disconnected(void)
 {
   emit finished(m_html, m_content_type_supported, m_is_image);
 }
