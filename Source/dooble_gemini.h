@@ -67,6 +67,7 @@ class dooble_gemini_implementation: public QSslSocket
   void slot_ready_read(void);
   void slot_write_timeout(void);
   void slot_statechange(QAbstractSocket::SocketState state);
+  void slot_sockerr(QAbstractSocket::SocketError);
   void slot_peerverifyerror(QSslError err);
   void slot_sslerrors(const QList<QSslError> &errs);
 

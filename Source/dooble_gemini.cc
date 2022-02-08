@@ -25,7 +25,7 @@ void dooble_gemini::requestStarted(QWebEngineUrlRequestJob *request)
      m_request);
 
   connect(gemini_implementation,
-	  SIGNAL(error(QWebEngineUrlRequestJob::Error)),
+      SIGNAL(error(QWebEngineUrlRequestJob::Error)),
 	  this,
 	  SLOT(slot_error(QWebEngineUrlRequestJob::Error)));
   connect(gemini_implementation,
@@ -111,6 +111,41 @@ dooble_gemini_implementation::dooble_gemini_implementation
  QObject *parent): QSslSocket(parent)
 {
   qDebug() << "Connect begin";
+  qDebug() << "Available TLS backends:" << availableBackends();
+  qDebug() << "Active TLS backend:" << activeBackend();
+  m_write_timer.setSingleShot(true);
+
+  qDebug() << "Registering connections";
+  qDebug() << connect(this, &QAbstractSocket::stateChanged,
+                      this, &dooble_gemini_implementation::slot_statechange)
+           << "QAbstractSocket::StateChange";
+  qDebug() << connect(this, &QSslSocket::connected,
+                      this, &dooble_gemini_implementation::slot_connected)
+           << "QSslSocket::Connected";
+  qDebug() << connect(this, &QSslSocket::encrypted,
+                      this, &dooble_gemini_implementation::slot_encrypted)
+           << "QSslSocket::Encrypted";
+  qDebug() << connect(this, &QSslSocket::readyRead,
+                      this, &dooble_gemini_implementation::slot_ready_read)
+           << "QSslSocket::ReadyRead";
+  qDebug() << connect(this, &QSslSocket::disconnected,
+                      this, &dooble_gemini_implementation::slot_disconnected)
+           << "QSslSocket::Disconnected";
+  qDebug() << connect(this, &QSslSocket::sslErrors,
+                      this, &dooble_gemini_implementation::slot_sslerrors)
+           << "QSslSocket::SslErrors";
+  qDebug() << connect(this, &QSslSocket::peerVerifyError,
+                      this, &dooble_gemini_implementation::slot_peerverifyerror)
+           << "QSslSocket::PeerVerifyError";
+  qDebug() << connect(&m_write_timer, &QTimer::timeout,
+                      this, &dooble_gemini_implementation::slot_write_timeout)
+           << "QTimer::Timeout";
+  qDebug() << connect(this, &QAbstractSocket::errorOccurred,
+                      this, &dooble_gemini_implementation::slot_sockerr)
+           << "QAbstractSocket::ErrorOccurred";
+
+  qDebug() << "Connections registered";
+
   m_content_type_supported = true;
   m_web_engine_view = web_engine_view;
   m_is_image = false;
@@ -123,43 +158,12 @@ dooble_gemini_implementation::dooble_gemini_implementation
 
   auto qsc = sslConfiguration();
   qsc.setProtocol(QSsl::TlsV1_2OrLater);
+  qsc.setPeerVerifyDepth(1);
+  qsc.setPeerVerifyMode(QSslSocket::PeerVerifyMode::VerifyNone);
   qsc.setCaCertificates(QList<QSslCertificate> {});
   //qsc.setCaCertificates(QSslConfiguration::systemCaCertificates());
   setSslConfiguration(qsc);
 
-  m_write_timer.setSingleShot(true);
-  connect(&m_write_timer,
-	  SIGNAL(timeout(void)),
-	  this,
-      SLOT(slot_write_timeout(void)));
-  connect(this,
-      SIGNAL(connected(void)),
-      this,
-      SLOT(slot_connected(void)));
-  connect(this,
-      SIGNAL(encrypted(void)),
-      this,
-      SLOT(slot_encrypted(void)));
-  connect(this,
-      SIGNAL(disconnected(void)),
-      this,
-      SLOT(slot_disconnected(void)));
-  connect(this,
-      SIGNAL(stateChanged(QAbstractSocket::SocketState)),
-      this,
-      SLOT(slot_statechange(QAbstractSocket::SocketState)));
-  connect(this,
-	  SIGNAL(readyRead(void)),
-	  this,
-	  SLOT(slot_ready_read(void)));
-  connect(this,
-          SIGNAL(sslErrors(const QList<QSslError> &)),
-          this,
-          SLOT(slot_sslerrors(const QList<QSslError> &)));
-  connect(this,
-          SIGNAL(peerVerifyError(QSslError)),
-          this,
-          SLOT(slot_peerverifyerror(QSslError)));
   connectToHostEncrypted(m_url.host(), static_cast<quint16> (m_url.port()));
 }
 
@@ -181,13 +185,11 @@ QByteArray dooble_gemini_implementation::plain_to_html(const QByteArray &bytes)
 void dooble_gemini_implementation::slot_connected(void)
 {
     qDebug() << "SIG: Connected";
-    waitForEncrypted(1000);
-    qDebug() << ".....waited for encrypted.";
 }
 
 void dooble_gemini_implementation::slot_encrypted(void)
 {
-    qDebug() << "SIG: Encrypted";
+  qDebug() << "SIG: Encrypted";
   QString output("");
   auto scheme(m_url.scheme());
   auto host(m_url.host());
@@ -232,13 +234,13 @@ void dooble_gemini_implementation::slot_encrypted(void)
 
 void dooble_gemini_implementation::slot_disconnected(void)
 {
-    qDebug() << "SIG: Disconnected";
+  qDebug() << "SIG: Disconnected";
   emit finished(m_html, m_content_type_supported, m_is_image);
 }
 
 void dooble_gemini_implementation::slot_ready_read(void)
 {
-    qDebug() << "SIG: ReadyRead";
+  qDebug() << "SIG: ReadyRead";
   while(bytesAvailable() > 0)
     m_content.append(readAll());
 
@@ -417,21 +419,24 @@ void dooble_gemini_implementation::slot_write_timeout(void)
 
 void dooble_gemini_implementation::slot_statechange(QAbstractSocket::SocketState state)
 {
-    qDebug() << "StateChange:" << state;
-    qDebug() << "ErrorString (if any):" << errorString();
-    qDebug() << "HandshakeErrors (if any):" << sslHandshakeErrors();
+    qDebug() << "SIG: StateChange:" << state;
 }
 
 void dooble_gemini_implementation::slot_peerverifyerror(QSslError err)
 {
-    qDebug() << "SIG: PeerVerifyError";
-    qDebug() << "PeerVerifyError:" << err;
-    ignoreSslErrors(QList<QSslError> {err});
+    qDebug() << "SIG: PeerVerifyError:" << err;
+    ignoreSslErrors(QList<QSslError> { err });
 }
 
 void dooble_gemini_implementation::slot_sslerrors(const QList<QSslError> &errs)
 {
-    qDebug() << "SIG: SSLErrors";
-    qDebug() << "SSLError:" << errs;
+    qDebug() << "SIG: SSLErrors:" << errs;
     ignoreSslErrors(errs);
+}
+
+void dooble_gemini_implementation::slot_sockerr(QAbstractSocket::SocketError)
+{
+    qDebug() << "SIG: SocketError:" << QAbstractSocket::error() << QAbstractSocket::errorString()
+             << sslHandshakeErrors().count();
+    ignoreSslErrors();
 }
