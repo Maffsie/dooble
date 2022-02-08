@@ -1,5 +1,8 @@
 //what copyright header should be here..?
 
+//REFERENCES
+// [1]: https://gemini.circumlunar.space/docs/specification.gmi (fetched 2022-02-08)
+
 #include <cctype>
 
 #include "dooble_gemini.h"
@@ -29,9 +32,9 @@ void dooble_gemini::requestStarted(QWebEngineUrlRequestJob *request)
 	  this,
 	  SLOT(slot_error(QWebEngineUrlRequestJob::Error)));
   connect(gemini_implementation,
-	  SIGNAL(finished(const QByteArray &, bool, bool)),
+      &dooble_gemini_implementation::finished,
 	  this,
-	  SLOT(slot_finished(const QByteArray &, bool, bool)));
+      &dooble_gemini::slot_finished);
 }
 
 void dooble_gemini::slot_error(QWebEngineUrlRequestJob::Error error)
@@ -41,68 +44,28 @@ void dooble_gemini::slot_error(QWebEngineUrlRequestJob::Error error)
 }
 
 void dooble_gemini::slot_finished(const QByteArray &bytes,
-				  bool content_type_supported,
-				  bool is_image)
+                                  QString content_type,
+                                  GeminiProtocol::StatusCode::StatusCodeEnum result,
+                                  QString charset,
+                                  QString lang,
+                                  QString meta)
 {
-  if(m_request)
-    {
-      if(bytes.isEmpty())
-	m_request->fail(QWebEngineUrlRequestJob::RequestFailed);
-      else
-	{
-	  /*
-	  ** The buffer object should be deleted when m_request is.
-	  */
-
-	  auto buffer = new QBuffer(m_request);
-
-	  if(content_type_supported && !is_image)
-	    buffer->setData
-	      (QByteArray(bytes).
-	       replace(dooble_gemini_implementation::s_eol, "<br>"));
-	  else
-	    buffer->setData(bytes);
-
-	  if(content_type_supported)
-	    {
-	      if(is_image)
-		{
-		  if(bytes.size() >= 2 &&
-		     std::tolower(bytes[0]) == 'b' &&
-		     std::tolower(bytes[1]) == 'm')
-		    m_request->reply("image/bmp", buffer);
-		  else if(bytes.size() >= 3 &&
-			  std::tolower(bytes[0]) == 'g' &&
-			  std::tolower(bytes[1]) == 'i' &&
-			  std::tolower(bytes[2]) == 'f')
-		    m_request->reply("image/gif", buffer);
-		  else if(bytes.size() >= 10 &&
-			  std::tolower(bytes[6]) == 'j' &&
-			  std::tolower(bytes[7]) == 'f' &&
-			  std::tolower(bytes[8]) == 'i' &&
-			  std::tolower(bytes[9]) == 'f')
-		    m_request->reply("image/jpeg", buffer);
-		  else if(bytes.size() >= 4 &&
-			  std::tolower(bytes[1]) == 'p' &&
-			  std::tolower(bytes[2]) == 'n' &&
-			  std::tolower(bytes[3]) == 'g')
-		    m_request->reply("image/png", buffer);
-		  else if(bytes.size() >= 4 &&
-			  std::tolower(bytes[0]) == 'r' &&
-			  std::tolower(bytes[1]) == 'i' &&
-			  std::tolower(bytes[2]) == 'f' &&
-			  std::tolower(bytes[3]) == 'f')
-		    m_request->reply("image/webp", buffer);
-		  else
-		    m_request->reply("application/octet-stream", buffer);
-		}
-	      else
-		m_request->reply("text/html", buffer);
-	    }
-	  else
-	    m_request->reply("application/octet-stream", buffer);
-	}
+  if(m_request) {
+    if(bytes.isEmpty())
+      m_request->fail(QWebEngineUrlRequestJob::RequestFailed);
+    else if(result == GeminiProtocol::StatusCode::RedirectPermanent || result == GeminiProtocol::StatusCode::RedirectTemporary)
+        m_request->redirect(meta);
+    else {
+      //The buffer object should be deleted when m_request is.
+      auto buffer = new QBuffer(m_request);
+      buffer->setData(bytes);
+      m_request->setProperty("Content-Encoding", charset);
+      m_request->setProperty("Language", lang);
+      if(content_type == "text/gemini")
+          content_type = "text/html";
+      m_request->reply(content_type.toUtf8(), buffer);
     }
+  }
 }
 
 dooble_gemini_implementation::dooble_gemini_implementation
@@ -111,8 +74,6 @@ dooble_gemini_implementation::dooble_gemini_implementation
  QObject *parent): QSslSocket(parent)
 {
   qDebug() << "Connect begin";
-  qDebug() << "Available TLS backends:" << availableBackends();
-  qDebug() << "Active TLS backend:" << activeBackend();
   m_write_timer.setSingleShot(true);
 
   qDebug() << "Registering connections";
@@ -143,25 +104,34 @@ dooble_gemini_implementation::dooble_gemini_implementation
   qDebug() << connect(this, &QAbstractSocket::errorOccurred,
                       this, &dooble_gemini_implementation::slot_sockerr)
            << "QAbstractSocket::ErrorOccurred";
+  qDebug() << connect(this, &QSslSocket::handshakeInterruptedOnError,
+                      this, &dooble_gemini_implementation::slot_handshakeerror)
+           << "QSslSocket::HandshakeInterruptedOnError";
 
   qDebug() << "Connections registered";
 
+  m_loaded = false;
+  m_meta = "";
+  m_status_code = GeminiProtocol::StatusCode::Unknown;
+  m_content_type = "";
+  m_lang = "";
   m_content_type_supported = true;
   m_web_engine_view = web_engine_view;
   m_is_image = false;
   m_item_type = 0;
   m_seven_count = 0;
   m_url = url;
+  m_inside_pre = false;
+  m_inside_list = false;
+  m_inside_quote = false;
 
   if(m_url.port() == -1)
     m_url.setPort(1965);
 
   auto qsc = sslConfiguration();
   qsc.setProtocol(QSsl::TlsV1_2OrLater);
-  qsc.setPeerVerifyDepth(1);
-  qsc.setPeerVerifyMode(QSslSocket::PeerVerifyMode::VerifyNone);
-  qsc.setCaCertificates(QList<QSslCertificate> {});
-  //qsc.setCaCertificates(QSslConfiguration::systemCaCertificates());
+  //qsc.setCaCertificates(QList<QSslCertificate> {});
+  qsc.setCaCertificates(QSslConfiguration::systemCaCertificates());
   setSslConfiguration(qsc);
 
   connectToHostEncrypted(m_url.host(), static_cast<quint16> (m_url.port()));
@@ -171,15 +141,216 @@ dooble_gemini_implementation::~dooble_gemini_implementation()
 {
 }
 
+bool dooble_gemini_implementation::parse_header(const QByteArray &bytes)
+{
+    //ref1 section 3.1: Gemini responses - Response headers
+    QRegularExpression hReSimple("^([0-9]{2})( (.*))?\r\n$");
+    auto hMatches = hReSimple.match(bytes);
+    //3.1 - server must not send a STATUS that is not two digits
+    //3.1 - server must not send a META longer than 1024 bytes
+    if(!hMatches.isValid() || (
+            hMatches.lastCapturedIndex() == 3 &&
+            hMatches.captured(3).length() > 1024)
+    )
+        return false;
+
+    m_status_code = GeminiProtocol::StatusCode::StatusCodeEnum(hMatches.captured(1).toInt());
+    if(hMatches.lastCapturedIndex() == 3)
+        m_meta = hMatches.captured(3);
+
+    switch (m_status_code) {
+    case GeminiProtocol::StatusCode::Input:
+    case GeminiProtocol::StatusCode::InputSensitive:
+        //3.2.1 - [1x] INPUT
+        // disconnect, prompt the user with the message contained in m_meta,
+        //  retry with response urlencoded as a single parameter name with no value
+        // no response body
+        //TODO: implement lol
+        break;
+    case GeminiProtocol::StatusCode::Success:
+        //3.2.2 - [2x] SUCCESS
+        // response body
+        //ref1 section 3.3: Response bodies
+        // if META is empty, it MUST default to text/gemini;charset=utf-8;lang=en
+        //ref1 section 5.2: Parameters conflicts - this dictates that a single
+        // parameter, lang, may be specified, and its default should be context-
+        //  dependent and decided by the client (ie., the user's own language)
+        // however section 3.3 specifies a charset parameter with a default
+        //  value of utf-8. I will simply implement both.
+        // The spec for a 2x meta is thus interpreted as
+        //  <mimetype>[;charset=<charset>][;lang=<lang>]
+        // and the order of optional parameters is not fixed
+        if (m_meta.length() == 0)
+            m_meta = "text/gemini; charset=utf-8; lang=en";
+        else {
+            auto metas = m_meta.replace(' ',nullptr).split(';');
+            m_content_type = metas.at(0);
+            metas.remove(0);
+            foreach(auto m, metas) {
+                auto kv = m.split('=');
+                if(kv.length() != 2)
+                    qDebug() << "E: parse_header: 2x: meta: params: param was not a key=val:" << m;
+                else {
+                    if(kv.at(0) == "charset")
+                        m_charset = kv.at(1);
+                    else if(kv.at(0) == "lang")
+                        m_lang = kv.at(1);
+                    else
+                        qDebug() << "E: parse_header: 2x: meta: params: unrecognised param:" << m;
+                }
+            }
+        }
+        if(m_content_type.length() == 0) m_content_type="text/gemini";
+        if(m_lang.length() < 2) m_lang="en";
+        if(m_charset.length() == 0) m_charset="utf-8";
+        break;
+    case GeminiProtocol::StatusCode::RedirectTemporary:
+    case GeminiProtocol::StatusCode::RedirectPermanent:
+        //3.2.3 - [3x] REDIRECT
+        // disconnect, m_meta contains a relative or absolute URI to be used instead.
+        //  client MUST NOT honour a previous INPUT response when following a REDIRECT
+        // no response body
+        //TODO: implement lol
+        if(m_meta.length() == 0)
+            emit dooble_gemini_implementation::error(QWebEngineUrlRequestJob::Error::RequestFailed);
+        break;
+    case GeminiProtocol::StatusCode::FailureTemporary:
+    case GeminiProtocol::StatusCode::FailureServerUnavailable:
+    case GeminiProtocol::StatusCode::FailureCgiError:
+    case GeminiProtocol::StatusCode::FailureProxyError:
+    case GeminiProtocol::StatusCode::FailureSlowDown:
+        //3.2.4 - [4x] TEMPORARY FAILURE
+        // disconnect, m_meta contains any additional information, should be shown to user
+        // request may be retried
+        //  no response body
+        //TODO: implement lol
+        emit dooble_gemini_implementation::error(QWebEngineUrlRequestJob::Error::RequestFailed);
+        break;
+    case GeminiProtocol::StatusCode::FailurePermanent:
+    case GeminiProtocol::StatusCode::NotFound:
+    case GeminiProtocol::StatusCode::Gone:
+    case GeminiProtocol::StatusCode::FailureProxyRequestRefused:
+    case GeminiProtocol::StatusCode::FailureBadRequest:
+        //3.2.5 - [5x] PERMANENT FAILURE
+        // disconnect, m_meta contains any additional information, should be shown to user
+        // request may not be retried
+        //  no response body
+        //TODO: implement lol
+        emit dooble_gemini_implementation::error(QWebEngineUrlRequestJob::Error::RequestFailed);
+        break;
+    case GeminiProtocol::StatusCode::ClientCertificateRequired:
+    case GeminiProtocol::StatusCode::ClientCertificateNotAuthorised:
+    case GeminiProtocol::StatusCode::ClientCertificateNotValid:
+        //3.2.6 - [6x] CLIENT CERTIFICATE REQUIRED
+        //
+        emit dooble_gemini_implementation::error(QWebEngineUrlRequestJob::Error::RequestFailed);
+        break;
+    case GeminiProtocol::StatusCode::Unknown:
+    default:
+        qDebug() << "E: unhandled m_status_code" << m_status_code;
+    }
+    // unicode is working now but i literally don't know if this is why
+    //..afraid to remove it..
+    m_web_engine_view->web_engine_profile()->settings()->setDefaultTextEncoding(m_charset);
+
+    return true;
+}
 QByteArray dooble_gemini_implementation::plain_to_html(const QByteArray &bytes)
 {
+  qDebug() << "Entered plain_to_html with the following number of bytes:" << bytes.length();
   auto b(bytes);
+  QList<QByteArray> rls = {};
+  QRegularExpression headRe("^([#]+) ?(.*)\r?$");
+  QRegularExpression hrefRe("^=> ?([a-zA-Z0-9\\-\\./_:~?%@]*)([\t ](.*))?\r?$");
+  foreach(auto l, b.split('\n')) {
+      //``` 5.4.3 Preformatting toggle lines
+      if (l.startsWith("```")) {
+          if(m_inside_list) {
+              m_inside_list = false;
+              rls.append("</ul>");
+          }
+          //this needed to be a member function because this function can be called
+          // repeatedly as more content comes in from the server..
+          // it seems to be in 4kb chunks.
+          if(m_inside_pre) {
+              rls.append("</pre>");
+              m_inside_pre = false;
+          } else {
+              rls.append("<pre>");
+              m_inside_pre = true;
+          }
+      } else if (m_inside_pre) {
+          rls.append(l);
+      } else if(l.startsWith("=>")) {
+          if(m_inside_list) {
+              m_inside_list = false;
+              rls.append("</ul>");
+          }
+          //https://gemini.circumlunar.space/docs/specification.gmi section 5.4.2 Link lines
+          auto ml = hrefRe.match(l);
+          if(!ml.isValid()) {
+              l.replace('\r', "<br/>");
+              if(!l.endsWith("<br/>"))
+                l.append("<br/>");
+              rls.append(l);
+          } else {
+              if(ml.lastCapturedIndex()==3)
+                    rls.append(QString("<a href=\"%1\">%2</a><br/>")
+                               .arg(ml.captured(1),
+                                    ml.captured(3))
+                               .toUtf8());
+              else
+                  rls.append(QString("<a href=\"%1\">%1</a><br/>")
+                             .arg(ml.captured(1))
+                             .toUtf8());
+          }
+      } else if (l.startsWith('#')) {
+          auto ml = headRe.match(l);
+          if(!ml.isValid() || ml.lastCapturedIndex() != 2) {
+              l.replace('\r', "<br/>");
+              if(!l.endsWith("<br/>"))
+                l.append("<br/>");
+              rls.append(l);
+          //technically this breaks the gemdoc spec, because it permits
+          // header levels above h3, but all other implementations really felt gross
+          // why am i so bad at c++
+          } else {
+              //how in the world do i rotate text in mspaint
+              QString h;
+              h.setNum(ml.captured(1).length());
+              //literally if i do <h%1> then it seems like it breaks string formatting
+              // and the output is -literally- <h%1>, and the docs don't say how to
+              // denote the beginning and end of a string formatting thing, so idk
+              // if there's like, <h{%1}> or what.
+              rls.append(QString("<h`>%1</h`>").replace('`', h)
+                          .arg(ml.captured(2)).toUtf8());
+          }
+      } else if (l.startsWith('*')) {
+          //* 5.5.2 Unordered list items
+          if(!m_inside_list) {
+              m_inside_list = true;
+              rls.append("<ul>");
+          }
+          rls.append(QString("<li>%1</li>").arg(l).toUtf8());
+      } else {
+          if(m_inside_list) {
+              m_inside_list = false;
+              rls.append("</ul>");
+          }
+          //TODO: > 5.5.3 Quote lines
+          //at some point when i got unicode working, this stopped working.
+          l.replace('\r', "<br/>");
+          if (!l.endsWith("<br/>"))
+            l.append("<br/>");
+          /*l.replace("<", "&lt;");
+          l.replace(">", "&gt;");
+          l.replace("&", "&amp;");
+          l.replace(" ", "&nbsp;");*/
+          rls.append(l);
+      }
+  }
 
-  b.replace("&", "&amp;");
-  b.replace("<", "&lt;");
-  b.replace(">", "&gt;");
-  b.replace(" ", "&nbsp;");
-  return b;
+  return rls.join("\n");;
 }
 
 void dooble_gemini_implementation::slot_connected(void)
@@ -191,36 +362,28 @@ void dooble_gemini_implementation::slot_encrypted(void)
 {
   qDebug() << "SIG: Encrypted";
   QString output("");
+  //ref1 section 2: Gemini requests
+  //client MUST send an absolute URL followed by s_eol, and nothing else
   auto scheme(m_url.scheme());
   auto host(m_url.host());
   auto path(m_url.path());
   auto query(m_url.query());
-
-  // Gemini spec indicates that a request URL may either be a relative path
-  //  OR an absolute path, including scheme.
-  // Relative path is simpler to implement, but absolute path permits
-  //  server-side vhost identification (along with SNI) and server-side proxying
-  //  although this -could- be a preference?
   output.append(scheme);
   output.append("://");
   output.append(host);
+
   if(path.length() <= 1)
-    {
       output.append("/");
-    }
   else
-    {
       output.append(path);
-     }
 
   if(!query.isEmpty())
     {
       output.append("?");
       output.append(query);
     }
-
   output.append("\r\n");
-  qDebug() << output;
+  qDebug() << "Request, as sent to the server:" << output;
   m_output = output;
   m_web_engine_view->page()->runJavaScript
     ("if(document.getElementById(\"input_value\") != null)"
@@ -235,7 +398,9 @@ void dooble_gemini_implementation::slot_encrypted(void)
 void dooble_gemini_implementation::slot_disconnected(void)
 {
   qDebug() << "SIG: Disconnected";
-  emit finished(m_html, m_content_type_supported, m_is_image);
+  if(m_loaded)
+    m_html.append("</body></html>");
+  emit finished(m_html, m_content_type, m_status_code, m_charset, m_lang, m_meta);
 }
 
 void dooble_gemini_implementation::slot_ready_read(void)
@@ -244,52 +409,28 @@ void dooble_gemini_implementation::slot_ready_read(void)
   while(bytesAvailable() > 0)
     m_content.append(readAll());
 
-  auto bytes(m_content.mid(0, m_content.indexOf(s_eol) + 1));
-  m_header = bytes;
-  m_content.remove(0, m_header.length());
-  qDebug() << m_header;
+  if(!m_loaded) {
+      auto bytes(m_content.mid(0, m_content.indexOf(s_eol) + 2));
+      m_header = bytes;
+      m_content.remove(0, m_header.length());
+      if (!parse_header(m_header)) {
+          emit error(QWebEngineUrlRequestJob::Error::RequestFailed);
+      }
+      m_html.append(QString("<html charset=\"%1\" lang=\"%2\"><head><meta charset=\"%1\"/></head><body>")
+                    .arg(m_charset, m_lang).toUtf8());
+      m_html.append(QString("<p><b>Debug:</b><br/>Response Code: %1<br/>MIMEType: %2<br/>Character Encoding: %3<br/>Language: %4<br/>").arg(
+                        QMetaEnum::fromType<GeminiProtocol::StatusCode::StatusCodeEnum>()
+                            .valueToKey(m_status_code),
+                        m_content_type, m_charset, m_lang).toUtf8());
+      m_html.append("</p>");
+      m_loaded = true;
+  }
+  if(m_content.length() > 0) {
+    m_html.append(plain_to_html(m_content));
+    m_content.clear();
+  }
 
-  if(m_item_type == '0') /* Plaintext */
-    {
-      m_html.append
-	("<html><head></head><body style=\"font-family: monospace\">");
-      m_html.append(plain_to_html(m_content));
-      m_html.append("</body></html>");
-      m_content.clear();
-    }
-  else if(m_item_type == '4' || /* BinHex Encoded Text File */
-	  m_item_type == '5' || /* Binary Archive File */
-	  m_item_type == '6' || /* UUEncoded Text File */
-	  m_item_type == '9')   /* Binary File */
-    {
-      m_content_type_supported = false;
-      m_html.append(m_content);
-      m_content.clear();
-    }
-  else if(m_item_type == 'I') /* Image File of Unspecified Format */
-    {
-      m_html.append(m_content);
-      m_is_image = true;
-      m_content.clear();
-    }
-  else if(m_item_type == 'g') /* GIF Image */
-    {
-      m_html.append(m_content);
-      m_is_image = true;
-      m_content.clear();
-    }
-  else if(m_item_type == 'h') /* HTML File */
-    {
-      m_html.append(m_content);
-      m_content.clear();
-    }
-  else if(m_item_type == 's') /* Audio File Format */
-    {
-      m_content_type_supported = false;
-      m_html.append(m_content);
-      m_content.clear();
-    }
-  else
+  if(false)
     {
       m_html.append
 	("<html><head></head><body style=\"font-family: monospace\">");
@@ -436,7 +577,12 @@ void dooble_gemini_implementation::slot_sslerrors(const QList<QSslError> &errs)
 
 void dooble_gemini_implementation::slot_sockerr(QAbstractSocket::SocketError)
 {
-    qDebug() << "SIG: SocketError:" << QAbstractSocket::error() << QAbstractSocket::errorString()
-             << sslHandshakeErrors().count();
+    qDebug() << "SIG: SocketError:" << QAbstractSocket::error() << QAbstractSocket::errorString();
     ignoreSslErrors();
+}
+
+void dooble_gemini_implementation::slot_handshakeerror(const QSslError &e)
+{
+    qDebug() << "SIG: HandshakeError:" << e;
+    continueInterruptedHandshake();
 }
