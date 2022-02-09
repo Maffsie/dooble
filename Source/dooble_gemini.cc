@@ -397,7 +397,7 @@ void dooble_gemini_implementation::slot_encrypted(void)
 void dooble_gemini_implementation::slot_disconnected(void)
 {
   qDebug() << "SIG: Disconnected";
-  if(m_loaded)
+  if(m_loaded && m_content_type.startsWith("text"))
     m_html.append("</body></html>");
   emit finished(m_html, m_content_type, m_status_code, m_charset, m_lang, m_meta);
 }
@@ -415,136 +415,23 @@ void dooble_gemini_implementation::slot_ready_read(void)
       if (!parse_header(m_header)) {
           emit error(QWebEngineUrlRequestJob::Error::RequestFailed);
       }
-      m_html.append(QString("<html charset=\"%1\" lang=\"%2\"><head><meta charset=\"%1\"/></head><body>")
-                    .arg(m_charset, m_lang).toUtf8());
-      m_html.append(QString("<p><b>Debug:</b><br/>Response Code: %1<br/>MIMEType: %2<br/>Character Encoding: %3<br/>Language: %4<br/>").arg(
-                        QMetaEnum::fromType<GeminiProtocol::StatusCode::StatusCodeEnum>()
-                            .valueToKey(m_status_code),
-                        m_content_type, m_charset, m_lang).toUtf8());
-      m_html.append("</p>");
+      if(m_content_type.startsWith("text")) {
+          auto hdr = QString("Response: %1\nMeta: %2\nMIME: %3\nCharset: %4\nLang: %5\n");
+          if(m_content_type == "text/gemini")
+              hdr = QString("<html charset=\"%4\" lang=\"%5\"><head><meta charset=\"%4\"/></head><body><p><b>Response: </b>%1<br/><b>Meta: </b>%2<br/><b>MIME: </b>%3<br/><b>Charset: </b>%4<br/><b>Lang: </b>%5</p>");
+          m_html.append(hdr.arg(QMetaEnum::fromType
+                                    <GeminiProtocol::StatusCode::StatusCodeEnum>
+                                    ().valueToKey(m_status_code),
+                                m_meta, m_content_type, m_charset, m_lang).toUtf8());
+      }
       m_loaded = true;
   }
-  if(m_content.length() > 0) {
-    m_html.append(plain_to_html(m_content));
+    if(m_content.length() > 0) {
+      if(m_content_type == "text/gemini")
+        m_html.append(plain_to_html(m_content));
+      else m_html.append(m_content);
     m_content.clear();
   }
-
-  if(false)
-    {
-      m_html.append
-	("<html><head></head><body style=\"font-family: monospace\">");
-
-      while(m_content.contains(s_eol))
-	{
-      auto bytes(m_content.mid(0, m_content.indexOf(s_eol) + 1));
-
-	  m_content.remove(0, bytes.length());
-	  bytes = bytes.trimmed();
-
-	  auto c = bytes.length() > 0 ? bytes.at(0) : '0';
-
-	  if(c == '+' ||
-	     c == '0' ||
-	     c == '1' ||
-	     c == '3' ||
-	     c == '4' ||
-	     c == '5' ||
-	     c == '6' ||
-	     c == '9' ||
-	     c == 'I' ||
-	     c == 'g' ||
-	     c == 'h' ||
-	     c == 'i' ||
-	     c == 's')
-	    /*
-	    ** Some things, we understand.
-	    */
-
-	    bytes.remove(0, 1);
-
-	  auto list(bytes.split('\t'));
-
-	  if(c == '+' ||
-	     c == '0' ||
-	     c == '1' ||
-	     c == '4' ||
-	     c == '5' ||
-	     c == '6' ||
-	     c == '9' ||
-	     c == 'I' ||
-	     c == 'g' ||
-	     c == 'h' ||
-	     c == 's')
-	    {
-	      auto port = list.value(3).toInt();
-
-	      if(port <= 0)
-		port = 70;
-
-	      m_html.append
-		(QString("<a href=\"gemini://%1:%2/%3%4\" "
-			 "style=\"text-decoration: none;\">%5</a>%6<br>").
-		 arg(list.value(2).trimmed().constData()).
-		 arg(port).
-		 arg(c).
-		 arg(list.value(1).constData() + (list.value(1).
-						  mid(0, 1) == "/")).
-		 arg(plain_to_html(list.value(0)).constData()).
-		 arg(c == '1' ? "..." : "").toUtf8());
-	    }
-	  else if(c == '3' || c == 'i')
- 	    {
-	      auto information(list.value(0));
-
-	      if(c == 'i')
- 		{
-		  m_html.append(plain_to_html(information));
-		  m_html.append("<br>");
- 		}
- 	      else
- 		{
-		  m_html.append("<span style=\"color: red;\">");
-		  m_html.append(plain_to_html(information));
-		  m_html.append("</span>");
-		  m_html.append("<br>");
- 		}
- 	    }
-	  else if(c == '7' && m_seven_count == 0)
-	    {
-	      /*
-	      ** Create an input search field.
-	      */
-
-	      auto port = list.value(3).toInt();
-
-	      if(port <= 0)
-		port = 70;
-
-	      m_html.append
-		(QString("<form action=\"gemini://%1:%2/%3%4\" "
-			 "method=\"post\">"
-			 "<input id=\"input_value\" "
-			 "placeholder=\"Search\" type=\"search\" "
-			 "value=\"%5\"></input>"
-			 "<button type=\"submit\">&#128269;</button>"
-			 "</form><br>").
-		 arg(list.value(2).trimmed().constData()).
-		 arg(port).
-		 arg(c).
-		 arg(list.value(1).constData() + (list.value(1).
-						  mid(0, 1) == "/")).
-		 arg(m_search).toUtf8());
-	      m_seven_count += 1;
-	    }
-	  else
- 	    {
-	      m_html.append(plain_to_html(bytes));
-	      m_html.append("<br>");
- 	    }
- 	}
-
-      m_html.append("</body></html>");
-    }
 }
 
 void dooble_gemini_implementation::slot_write_timeout(void)
