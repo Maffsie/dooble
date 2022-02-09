@@ -183,7 +183,7 @@ bool dooble_gemini_implementation::parse_header(const QByteArray &bytes)
         if (m_meta.length() == 0)
             m_meta = "text/gemini; charset=utf-8; lang=en";
         else {
-            auto metas = m_meta.replace(' ',nullptr).split(';');
+            auto metas = m_meta.replace(' ',"").split(';');
             m_content_type = metas.at(0);
             metas.remove(0);
             foreach(auto m, metas) {
@@ -249,9 +249,6 @@ bool dooble_gemini_implementation::parse_header(const QByteArray &bytes)
     default:
         qDebug() << "E: unhandled m_status_code" << m_status_code;
     }
-    // unicode is working now but i literally don't know if this is why
-    //..afraid to remove it..
-    m_web_engine_view->web_engine_profile()->settings()->setDefaultTextEncoding(m_charset);
 
     return true;
 }
@@ -262,6 +259,7 @@ QByteArray dooble_gemini_implementation::plain_to_html(const QByteArray &bytes)
   QList<QByteArray> rls = {};
   QRegularExpression headRe("^([#]+) ?(.*)\r?$");
   QRegularExpression hrefRe("^=> ?([a-zA-Z0-9\\-\\./_:~?%@]*)([\t ](.*))?\r?$");
+  QRegularExpression liRe("^\\*[\t ]?(.*)\r?$");
   foreach(auto l, b.split('\n')) {
       //``` 5.4.3 Preformatting toggle lines
       if (l.startsWith("```")) {
@@ -269,8 +267,8 @@ QByteArray dooble_gemini_implementation::plain_to_html(const QByteArray &bytes)
               m_inside_list = false;
               rls.append("</ul>");
           }
-          //this needed to be a member function because this function can be called
-          // repeatedly as more content comes in from the server..
+          //this needed to be a non-static function because this function can be called
+          // repeatedly as more content comes in from the server, and we need to track state..
           // it seems to be in 4kb chunks.
           if(m_inside_pre) {
               rls.append("</pre>");
@@ -327,11 +325,12 @@ QByteArray dooble_gemini_implementation::plain_to_html(const QByteArray &bytes)
           }
       } else if (l.startsWith('*')) {
           //* 5.5.2 Unordered list items
+          auto ml = liRe.match(l);
           if(!m_inside_list) {
               m_inside_list = true;
               rls.append("<ul>");
           }
-          rls.append(QString("<li>%1</li>").arg(l).toUtf8());
+          rls.append(QString("<li>%1</li>").arg(ml.captured(1)).toUtf8());
       } else {
           if(m_inside_list) {
               m_inside_list = false;
