@@ -346,6 +346,12 @@ QByteArray dooble_gemini_implementation::plain_to_html(const QByteArray &bytes)
         rls.append("</ul>");
       }
       //https://gemini.circumlunar.space/docs/specification.gmi section 5.4.2 Link lines
+      // Note: The spec suggests this should handle several spaces instead of just 0 or 1
+      /* Link lines I've encountered that were not correctly parsed and I don't have time to fix right now:
+       * https://lists.h-net.org/cgi-bin/logbrowse.pl?trx=vx&list=edtech&month=9205&week=&msg=SfcDLi9jGSSIkJsnxaCcbg&user=&pw= [alt.gopher] Panda Announcement
+       * - should have been properly parsed, but instead was rendered as <a href="">(entire line)</a>
+       *
+       */
       auto ml = hrefRe.match(l);
       if(!ml.isValid())
       {
