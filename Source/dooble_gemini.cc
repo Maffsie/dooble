@@ -308,7 +308,7 @@ QByteArray dooble_gemini_implementation::plain_to_html(const QByteArray &bytes)
   //I don't want to look at other implementations, lest I be accused of
   // plagiarism, and also I just kind of like reading specs instead.
   QRegularExpression headRe("^([#]+) ?(.*)\r?$");
-  QRegularExpression hrefRe("^=> ?([a-zA-Z0-9\\-\\./_:~?%@]*)([\t ](.*))?\r?$");
+  QRegularExpression hrefRe("^=>[\t ]*([a-zA-Z0-9\\-\\./_:~?%@&=]*)([\t ]*(.*))?\r?$");
   QRegularExpression liRe("^\\*[\t ]?(.*)\r?$");
   foreach(auto l, b.split('\n'))
   {
@@ -346,12 +346,6 @@ QByteArray dooble_gemini_implementation::plain_to_html(const QByteArray &bytes)
         rls.append("</ul>");
       }
       //https://gemini.circumlunar.space/docs/specification.gmi section 5.4.2 Link lines
-      // Note: The spec suggests this should handle several spaces instead of just 0 or 1
-      /* Link lines I've encountered that were not correctly parsed and I don't have time to fix right now:
-       * https://lists.h-net.org/cgi-bin/logbrowse.pl?trx=vx&list=edtech&month=9205&week=&msg=SfcDLi9jGSSIkJsnxaCcbg&user=&pw= [alt.gopher] Panda Announcement
-       * - should have been properly parsed, but instead was rendered as <a href="">(entire line)</a>
-       *
-       */
       auto ml = hrefRe.match(l);
       if(!ml.isValid())
       {
