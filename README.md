@@ -1,4 +1,4 @@
-Dooble is the scientific browser.
+Dooble is a minimal, scientific, and stable Web browser.
 
 <ul>
 <li>A Web browser!</li>
@@ -10,14 +10,16 @@ Dooble is the scientific browser.
 <li>Custom search engines.</li>
 <li>Custom style sheets.</li>
 <li>Documented.</li>
-<li>Domain restrictions.</li>
+<li>Domain restrictions (blocker).</li>
 <li>Favorites.</li>
 <li>Floating digital clock.</li>
 <li>Floating minute history window.</li>
 <li>FreeBSD, Linux, Mac, OpenBSD, Windows.</li>
 <li>Gemini and Gopher support.</li>
+<li>Great for older hardware!</li>
+<li>Many private windows.</li>
 <li>Multiple private instances, including downloads.</li>
-<li>Native graphing of data.</li>
+<li>Native graphing of data for scientific research.</li>
 <li>Original implementations of AES-256, Threefish-256.</li>
 <li>Portable.</li>
 <li>Qt 6.2 LTS!</li>
@@ -26,4 +28,4 @@ Dooble is the scientific browser.
 <li>Windows portable.</li>
 </ul>
 
-![alt text](https://github.com/textbrowser/dooble/blob/master/Images/chart_1.png)
+![alt text](https://github.com/textbrowser/dooble/blob/master/Images/dooble_1.png)

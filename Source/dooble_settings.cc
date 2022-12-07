@@ -26,6 +26,7 @@
 */
 
 #include <QDir>
+#include <QFontDialog>
 #include <QKeyEvent>
 #include <QMessageBox>
 #include <QNetworkProxy>
@@ -55,6 +56,7 @@
 #include "dooble_ui_utilities.h"
 #include "dooble_version.h"
 
+QHash<QString, QString> dooble_settings::s_web_engine_settings_environment;
 QHash<QUrl, char> dooble_settings::s_javascript_block_popup_exceptions;
 QMap<QString, QVariant> dooble_settings::s_getenv;
 QMap<QString, QVariant> dooble_settings::s_settings;
@@ -95,6 +97,10 @@ dooble_settings::dooble_settings(void):dooble_main_window()
 	  SIGNAL(clicked(void)),
 	  this,
 	  SLOT(slot_page_button_clicked(void)));
+  connect(m_ui.display_application_font,
+	  SIGNAL(clicked(void)),
+	  this,
+	  SLOT(slot_select_application_font(void)));
   connect(m_ui.history,
 	  SIGNAL(clicked(void)),
 	  this,
@@ -192,7 +198,7 @@ dooble_settings::dooble_settings(void):dooble_main_window()
       if(!path.endsWith(QDir::separator()))
 	path.append(QDir::separator());
 
-      path.append("dooble_" + QLocale::system().name() + ".qm");
+      path.append("dooble_" + QLocale::system().name().mid(0, 2) + ".qm");
 
       QFileInfo file_info(path);
 
@@ -250,6 +256,7 @@ dooble_settings::dooble_settings(void):dooble_main_window()
   s_settings["auto_load_images"] = true;
   s_settings["block_cipher_type"] = "AES-256";
   s_settings["block_cipher_type_index"] = 0;
+  s_settings["block_third_party_cookies"] = true;
   s_settings["browsing_history_days"] = 15;
   s_settings["cache_size"] = 0;
   s_settings["cache_type_index"] = 0;
@@ -271,14 +278,21 @@ dooble_settings::dooble_settings(void):dooble_main_window()
   s_settings["language_index"] = 0;
   s_settings["local_storage"] = true;
   s_settings["main_menu_bar_visible"] = true;
+  s_settings["main_menu_bar_visible_shortcut_index"] = 1; // F10
   s_settings["pin_accepted_or_blocked_window"] = true;
   s_settings["pin_downloads_window"] = true;
   s_settings["pin_history_window"] = true;
   s_settings["pin_settings_window"] = true;
   s_settings["save_geometry"] = true;
+  s_settings["show_address_widget_completer"] = true;
+  s_settings["show_hovered_links_tool_tips"] = false;
+  s_settings["show_left_corner_widget"] = true;
+  s_settings["show_loading_gradient"] = true;
   s_settings["show_new_downloads"] = true;
+  s_settings["splash_screen"] = true;
   s_settings["status_bar_visible"] = true;
   s_settings["tab_position"] = "north";
+  s_settings["temporarily_disable_javascript"] = false;
   s_settings["theme_color"] = "default";
   s_settings["theme_color_index"] = 2; // Default
   s_settings["user_agent"] = QWebEngineProfile::defaultProfile()->
@@ -304,6 +318,7 @@ dooble_settings::dooble_settings(void):dooble_main_window()
 			       << "en_US"
 			       << "en_ZA"
 			       << "es_ANY"
+			       << "fr_FR"
 			       << "gd_GB"
 			       << "gl_ES"
 			       << "gug"
@@ -352,6 +367,7 @@ dooble_settings::dooble_settings(void):dooble_main_window()
 			       << "en_ZA"
 			       << "es_ANY"
 			       << "et_EE"
+			       << "fr_FR"
 			       << "gd_GB"
 			       << "gl_ES"
 			       << "gug"
@@ -403,7 +419,7 @@ dooble_settings::dooble_settings(void):dooble_main_window()
 	(tr("A valid list of dictionaries has not been prepared."));
     }
   else
-    for(const auto &i : s_spell_checker_dictionaries)
+    foreach(const auto &i, s_spell_checker_dictionaries)
       {
 	auto item = new QListWidgetItem(i);
 
@@ -504,7 +520,42 @@ QVariant dooble_settings::setting(const QString &k,
       return value;
     }
 
-  return s_settings.value(key, default_value);
+  if(key == "authentication_iteration_count")
+    return qBound
+      (15000, s_settings.value(key, default_value).toInt(), 999999999);
+  else if(key == "block_cipher_type_index")
+    return qBound(0, s_settings.value(key, default_value).toInt(), 1);
+  else if(key == "browsing_history_days")
+    return qBound(0, s_settings.value(key, default_value).toInt(), 365);
+  else if(key == "cache_size")
+    return qBound(0, s_settings.value(key, default_value).toInt(), 2048);
+  else if(key == "cache_type_index")
+    return qBound(0, s_settings.value(key, default_value).toInt(), 1);
+  else if(key == "cookie_policy_index")
+    return qBound(0, s_settings.value(key, default_value).toInt(), 2);
+  else if(key == "dooble_accepted_or_blocked_domains_"
+	          "maximum_session_rejections")
+    return qBound(1, s_settings.value(key, default_value).toInt(), 1000000);
+  else if(key == "favorites_sort_index")
+    return qBound(0, s_settings.value(key, default_value).toInt(), 2);
+  else if(key == "hash_type_index")
+    return qBound(0, s_settings.value(key, default_value).toInt(), 1);
+  else if(key == "icon_set_index")
+    return qBound(0, s_settings.value(key, default_value).toInt(), 1);
+  else if(key == "language_index")
+    return qBound(0, s_settings.value(key, default_value).toInt(), 1);
+  else if(key == "proxy_port")
+    return qBound(0, s_settings.value(key, default_value).toInt(), 65535);
+  else if(key == "theme_color_index")
+    return qBound(0, s_settings.value(key, default_value).toInt(), 4);
+  else if(key == "zoom")
+    return qBound(25, s_settings.value(key, default_value).toInt(), 500);
+  else if(key == "zoom_frame_location_index")
+    return qBound(0, s_settings.value(key, default_value).toInt(), 0);
+  else if(key.startsWith("history_horizontal_header_section_size_"))
+    return qBound(0, s_settings.value(key, default_value).toInt(), 1000000);
+  else
+    return s_settings.value(key, default_value);
 }
 
 bool dooble_settings::has_dooble_credentials(void)
@@ -576,6 +627,24 @@ bool dooble_settings::site_has_javascript_block_popup_exception(const QUrl &url)
   return s_javascript_block_popup_exceptions.value(url, 0) == 1;
 }
 
+int dooble_settings::main_menu_bar_visible_key(void)
+{
+  auto index = setting("main_menu_bar_visible_shortcut_index").toInt();
+
+  switch(index)
+    {
+    case 0:
+      {
+	return Qt::Key_Alt;
+      }
+    case 1:
+    default:
+      {
+	return Qt::Key_F10;
+      }
+    }
+}
+
 int dooble_settings::site_feature_permission
 (const QUrl &url, QWebEnginePage::Feature feature)
 {
@@ -584,7 +653,7 @@ int dooble_settings::site_feature_permission
 
   auto values(s_site_features_permissions.values(url));
 
-  for(const auto &value : values)
+  foreach(const auto &value, values)
     if(feature == QWebEnginePage::Feature(value.first) && value.first != -1)
       return value.second ? 1 : 0;
 
@@ -626,6 +695,11 @@ void dooble_settings::create_tables(QSqlDatabase &db)
      "url_digest TEXT NOT NULL PRIMARY KEY)");
   query.exec("CREATE TABLE IF NOT EXISTS dooble_settings ("
 	     "key TEXT NOT NULL PRIMARY KEY, "
+	     "value TEXT NOT NULL)");
+  query.exec("CREATE TABLE IF NOT EXISTS dooble_web_engine_settings ("
+	     "environment_variable INTEGER NOT NULL DEFAULT 0, "
+	     "key TEXT NOT NULL PRIMARY KEY, "
+	     "translate INTEGER NOT NULL DEFAULT 0, "
 	     "value TEXT NOT NULL)");
 }
 
@@ -686,11 +760,37 @@ void dooble_settings::new_javascript_block_popup_exception(const QUrl &url)
   save_javascript_block_popup_exception(url, true);
 }
 
+void dooble_settings::prepare_application_fonts(void)
+{
+  QFont font;
+
+  if(!font.fromString(m_ui.display_application_font->text().remove('&')))
+    font = dooble_application::font();
+
+  dooble::s_application->setFont(font);
+
+  foreach(auto widget, QApplication::allWidgets())
+    if(widget)
+      {
+	widget->setFont(font);
+	widget->updateGeometry();
+      }
+}
+
 void dooble_settings::prepare_fonts(void)
 {
   /*
   ** Fonts
   */
+
+  m_ui.display_application_font->setText
+    (s_settings.value("display_application_font").toString().trimmed());
+
+  if(m_ui.display_application_font->text().isEmpty())
+    m_ui.display_application_font->setText
+      (dooble_application::font().toString().trimmed());
+
+  prepare_application_fonts();
 
   {
     QFont font;
@@ -706,7 +806,7 @@ void dooble_settings::prepare_fonts(void)
 	     << QWebEngineSettings::SerifFont
 	     << QWebEngineSettings::StandardFont;
 
-    for(const auto family : families)
+    foreach(const auto family, families)
 #if (QT_VERSION < QT_VERSION_CHECK(6, 0, 0))
       fonts << QWebEngineSettings::defaultSettings()->fontFamily(family);
 #else
@@ -730,6 +830,8 @@ void dooble_settings::prepare_fonts(void)
 	  if(list.at(i).isEmpty())
 	    list.replace(i, fonts.at(i));
 
+	  list.replace(i, list.at(i).trimmed());
+
 #if (QT_VERSION < QT_VERSION_CHECK(6, 0, 0))
 	  QWebEngineSettings::defaultSettings()->setFontFamily
 	    (families.at(i), list.at(i));
@@ -740,19 +842,46 @@ void dooble_settings::prepare_fonts(void)
 	}
     }
 
-    font.fromString(list.at(0));
+    if(list.at(0).isEmpty() ||
+       !font.fromString(list.at(0)))
+      font = dooble_application::font();
+
     m_ui.web_font_cursive->setCurrentFont(font);
-    font.fromString(list.at(1));
+
+    if(list.at(1).isEmpty() ||
+       !font.fromString(list.at(1)))
+      font = dooble_application::font();
+
     m_ui.web_font_fantasy->setCurrentFont(font);
-    font.fromString(list.at(2));
+
+    if(list.at(2).isEmpty() ||
+       !font.fromString(list.at(2)))
+      font = dooble_application::font();
+
     m_ui.web_font_fixed->setCurrentFont(font);
-    font.fromString(list.at(3));
+
+    if(list.at(3).isEmpty() ||
+       !font.fromString(list.at(3)))
+      font = dooble_application::font();
+
     m_ui.web_font_pictograph->setCurrentFont(font);
-    font.fromString(list.at(4));
+
+    if(list.at(4).isEmpty() ||
+       !font.fromString(list.at(4)))
+      font = dooble_application::font();
+
     m_ui.web_font_sans_serif->setCurrentFont(font);
-    font.fromString(list.at(5));
+
+    if(list.at(5).isEmpty() ||
+       !font.fromString(list.at(5)))
+      font = dooble_application::font();
+
     m_ui.web_font_serif->setCurrentFont(font);
-    font.fromString(list.at(6));
+
+    if(list.at(6).isEmpty() ||
+       !font.fromString(list.at(6)))
+      font = dooble_application::font();
+
     m_ui.web_font_standard->setCurrentFont(font);
   }
 
@@ -851,14 +980,14 @@ void dooble_settings::prepare_icons(void)
 		                           << m_ui.web
 		                           << m_ui.windows);
 
-  for(auto i : list)
+  foreach(auto i, list)
     if(i->height() >= size.height() || i->width() >= size.width())
       size = i->size();
 
   size.setHeight(size.height() + 10);
   size.setWidth(size.width() + 10);
 
-  for(auto i : list)
+  foreach(auto i, list)
     i->resize(size);
 }
 
@@ -918,6 +1047,155 @@ void dooble_settings::prepare_table_statistics(void)
     (tr("%1 Row(s)").arg(m_ui.features_permissions->rowCount()));
   m_ui.javascript_block_popups_exceptions_entries->setText
     (tr("%1 Row(s)").arg(m_ui.javascript_block_popups_exceptions->rowCount()));
+}
+
+void dooble_settings::prepare_web_engine_environment_variables(void)
+{
+  if(s_web_engine_settings_environment.isEmpty())
+    {
+      s_web_engine_settings_environment
+	["--blink-settings=forceDarkModeEnabled"] = "boolean";
+      s_web_engine_settings_environment["--disable-reading-from-canvas"] =
+	"singular";
+      s_web_engine_settings_environment["--enable-zero-copy"] = "boolean";
+      s_web_engine_settings_environment["--ignore-certificate-errors"] =
+	"singular";
+      s_web_engine_settings_environment["--ignore-gpu-blocklist"] = "boolean";
+      s_web_engine_settings_environment["--enable-gpu-rasterization"] =
+	"boolean";
+      s_web_engine_settings_environment["--ignore-ssl-errors"] = "singular";
+    }
+
+  auto database_name(dooble_database_utilities::database_name());
+
+  {
+    auto db = QSqlDatabase::addDatabase("QSQLITE", database_name);
+
+    db.setDatabaseName(setting("home_path").toString() +
+		       QDir::separator() +
+		       "dooble_settings.db");
+
+    if(db.open())
+      {
+	QSqlQuery query(db);
+	QString string("");
+
+	query.setForwardOnly(true);
+	query.prepare
+	  ("SELECT key, value FROM dooble_web_engine_settings "
+	   "WHERE environment_variable = 1");
+
+	if(query.exec())
+	  while(query.next())
+	    {
+	      auto singular = s_web_engine_settings_environment.
+		value(query.value(0).toString().trimmed()) == "singular";
+
+	      if(query.value(1).toBool() == false && singular)
+		continue;
+
+	      string.append(query.value(0).toString().trimmed());
+
+	      if(!singular)
+		{
+		  string.append("=");
+		  string.append(query.value(1).toString().trimmed());
+		}
+
+	      string.append(" ");
+	    }
+
+	qputenv
+	  ("QTWEBENGINE_CHROMIUM_FLAGS", string.trimmed().toUtf8().constData());
+      }
+
+    db.close();
+  }
+
+  QSqlDatabase::removeDatabase(database_name);
+}
+
+void dooble_settings::prepare_web_engine_settings(void)
+{
+  disconnect(m_ui.web_engine_settings,
+	     SIGNAL(itemChanged(QTableWidgetItem *)),
+	     this,
+	     SLOT(slot_web_engine_settings_item_changed(QTableWidgetItem *)));
+  m_ui.web_engine_settings->setRowCount(0);
+
+  QHash<QString, QVariant> values;
+  auto database_name(dooble_database_utilities::database_name());
+
+  {
+    auto db = QSqlDatabase::addDatabase("QSQLITE", database_name);
+
+    db.setDatabaseName(setting("home_path").toString() +
+		       QDir::separator() +
+		       "dooble_settings.db");
+
+    if(db.open())
+      {
+	QSqlQuery query(db);
+
+	query.setForwardOnly(true);
+	query.prepare
+	  ("SELECT key, value FROM dooble_web_engine_settings "
+	   "WHERE environment_variable = 1");
+
+	if(query.exec())
+	  while(query.next())
+	    values[query.value(0).toString()] =
+	      query.value(1).toString().trimmed();
+      }
+
+    db.close();
+  }
+
+  QSqlDatabase::removeDatabase(database_name);
+
+  QHashIterator<QString, QString> it(s_web_engine_settings_environment);
+  int i = -1;
+
+  while(it.hasNext())
+    {
+      it.next();
+      m_ui.web_engine_settings->setRowCount
+	(m_ui.web_engine_settings->rowCount() + 1);
+
+      auto item = new QTableWidgetItem(it.key());
+
+      i += 1;
+      item->setFlags(Qt::ItemIsEnabled | Qt::ItemIsSelectable);
+      item->setToolTip(item->text());
+      m_ui.web_engine_settings->setItem(i, 0, item);
+      item = new QTableWidgetItem();
+      item->setFlags(Qt::ItemIsSelectable | Qt::ItemIsUserCheckable);
+      item->setToolTip(tr("Not implemented."));
+      m_ui.web_engine_settings->setItem(i, 1, item);
+      item = new QTableWidgetItem();
+      item->setData(Qt::UserRole, it.key());
+
+      if(values.value(it.key()).toBool())
+	item->setCheckState(Qt::Checked);
+      else
+	item->setCheckState(Qt::Unchecked);
+
+      if(it.value() == "boolean" || it.value() == "singular")
+	item->setFlags
+	  (Qt::ItemIsEnabled | Qt::ItemIsSelectable | Qt::ItemIsUserCheckable);
+      else
+	item->setFlags
+	  (Qt::ItemIsEditable | Qt::ItemIsEnabled | Qt::ItemIsSelectable);
+
+      m_ui.web_engine_settings->setItem(i, 2, item);
+    }
+
+  connect(m_ui.web_engine_settings,
+	  SIGNAL(itemChanged(QTableWidgetItem *)),
+	  this,
+	  SLOT(slot_web_engine_settings_item_changed(QTableWidgetItem *)));
+  m_ui.web_engine_settings->resizeColumnToContents(0);
+  m_ui.web_engine_settings->sortItems(0);
 }
 
 void dooble_settings::purge_database_data(void)
@@ -1100,6 +1378,8 @@ void dooble_settings::restore(bool read_database)
     (s_settings.value("animated_scrolling", false).toBool());
   m_ui.automatic_loading_of_images->setChecked
     (s_settings.value("auto_load_images", true).toBool());
+  m_ui.block_third_party_cookies->setChecked
+    (s_settings.value("block_third_party_cookies", true).toBool());
   m_ui.browsing_history->setValue
     (qBound(m_ui.browsing_history->minimum(),
 	    s_settings.value("browsing_history_days", 15).toInt(),
@@ -1166,6 +1446,12 @@ void dooble_settings::restore(bool read_database)
     (s_settings.value("local_storage", true).toBool());
   m_ui.main_menu_bar_visible->setChecked
     (s_settings.value("main_menu_bar_visible", true).toBool());
+  m_ui.main_menu_bar_visible_shortcut->setCurrentIndex
+    (s_settings.value("main_menu_bar_visible_shortcut_index").toInt());
+
+  if(m_ui.main_menu_bar_visible_shortcut->currentIndex() < 0)
+    m_ui.main_menu_bar_visible_shortcut->setCurrentIndex(1); // F10
+
   m_ui.pages->setCurrentIndex
     (qBound(0,
 	    s_settings.value("settings_page_index", 0).toInt(),
@@ -1193,10 +1479,18 @@ void dooble_settings::restore(bool read_database)
   m_ui.proxy_user->setCursorPosition(0);
   m_ui.save_geometry->setChecked
     (s_settings.value("save_geometry", true).toBool());
+  m_ui.show_address_widget_completer->setChecked
+    (s_settings.value("show_address_widget_completer", true).toBool());
   m_ui.show_hovered_links_tool_tips->setChecked
     (s_settings.value("show_hovered_links_tool_tips", false).toBool());
+  m_ui.show_left_corner_widget->setChecked
+    (s_settings.value("show_left_corner_widget", true).toBool());
+  m_ui.show_loading_gradient->setChecked
+    (s_settings.value("show_loading_gradient", true).toBool());
   m_ui.show_new_downloads->setChecked
     (s_settings.value("show_new_downloads", true).toBool());
+  m_ui.splash_screen->setChecked
+    (s_settings.value("splash_screen", true).toBool());
 
   auto tab_position
     (s_settings.value("tab_position").toString().trimmed());
@@ -1210,6 +1504,8 @@ void dooble_settings::restore(bool read_database)
   else
     m_ui.tab_position->setCurrentIndex(1);
 
+  m_ui.temporarily_disable_javascript->setChecked
+    (s_settings.value("temporarily_disable_javascript", false).toBool());
 #ifdef Q_OS_WIN
   m_ui.theme->setCurrentIndex
     (qBound(0,
@@ -1418,6 +1714,7 @@ void dooble_settings::restore(bool read_database)
 
   prepare_fonts();
   prepare_proxy(false);
+  prepare_web_engine_settings();
   QApplication::restoreOverrideCursor();
 }
 
@@ -1569,6 +1866,11 @@ void dooble_settings::save_settings(void)
     set_setting("settings_geometry", saveGeometry().toBase64());
 }
 
+void dooble_settings::set_settings_path(const QString &path)
+{
+  m_ui.settings_path->setText(path);
+}
+
 void dooble_settings::set_site_feature_permission
 (const QUrl &url, QWebEnginePage::Feature feature, bool state)
 {
@@ -1628,7 +1930,7 @@ void dooble_settings::set_site_feature_permission
     {
       auto values(s_site_features_permissions.values(url));
 
-      for(const auto &value : values)
+      foreach(const auto &value, values)
 	if(feature == QWebEnginePage::Feature(value.first) &&
 	   value.first != -1)
 	  {
@@ -2063,12 +2365,16 @@ void dooble_settings::slot_apply(void)
   set_setting("animated_scrolling", m_ui.animated_scrolling->isChecked());
   set_setting
     ("auto_load_images", m_ui.automatic_loading_of_images->isChecked());
+  set_setting
+    ("block_third_party_cookies", m_ui.block_third_party_cookies->isChecked());
   set_setting("browsing_history_days", m_ui.browsing_history->value());
   set_setting("cache_size", m_ui.cache_size->value());
   set_setting("cache_type_index", m_ui.cache_type->currentIndex());
   set_setting("center_child_windows", m_ui.center_child_windows->isChecked());
   set_setting("cookie_policy_index", m_ui.cookie_policy->currentIndex());
   set_setting("credentials_enabled", m_ui.credentials->isChecked());
+  set_setting
+    ("display_application_font", m_ui.display_application_font->text());
   set_setting("dns_prefetch", m_ui.dns_prefetch->isChecked());
   set_setting("do_not_track", m_ui.do_not_track->isChecked());
   set_setting
@@ -2097,6 +2403,8 @@ void dooble_settings::slot_apply(void)
   set_setting("language_index", m_ui.language->currentIndex());
   set_setting("local_storage", m_ui.local_storage->isChecked());
   set_setting("main_menu_bar_visible", m_ui.main_menu_bar_visible->isChecked());
+  set_setting("main_menu_bar_visible_shortcut_index",
+	      m_ui.main_menu_bar_visible_shortcut->currentIndex());
   set_setting("pin_accepted_or_blocked_window",
 	      m_ui.pin_accepted_or_blocked_domains->isChecked());
   set_setting("pin_downloads_window", m_ui.pin_downloads->isChecked());
@@ -2104,9 +2412,15 @@ void dooble_settings::slot_apply(void)
   set_setting("pin_settings_window", m_ui.pin_settings->isChecked());
   set_setting("private_mode", m_ui.private_mode->isChecked());
   set_setting("save_geometry", m_ui.save_geometry->isChecked());
+  set_setting("show_address_widget_completer",
+	      m_ui.show_address_widget_completer->isChecked());
   set_setting("show_hovered_links_tool_tips",
 	      m_ui.show_hovered_links_tool_tips->isChecked());
+  set_setting("show_left_corner_widget",
+	      m_ui.show_left_corner_widget->isChecked());
+  set_setting("show_loading_gradient", m_ui.show_loading_gradient->isChecked());
   set_setting("show_new_downloads", m_ui.show_new_downloads->isChecked());
+  set_setting("splash_screen", m_ui.splash_screen->isChecked());
 
   switch(m_ui.tab_position->currentIndex())
     {
@@ -2133,6 +2447,8 @@ void dooble_settings::slot_apply(void)
       }
     }
 
+  set_setting("temporarily_disable_javascript",
+	      m_ui.temporarily_disable_javascript->isChecked());
   set_setting("theme_color_index", m_ui.theme->currentIndex());
   set_setting("utc_time_zone", m_ui.utc_time_zone->isChecked());
   set_setting("visited_links", m_ui.visited_links->isChecked());
@@ -2145,6 +2461,7 @@ void dooble_settings::slot_apply(void)
   set_setting("zoom", m_ui.zoom->value());
   set_setting
     ("zoom_frame_location_index", m_ui.zoom_frame_location->currentIndex());
+  prepare_application_fonts();
   prepare_icons();
   QApplication::restoreOverrideCursor();
   emit applied();
@@ -2992,7 +3309,7 @@ void dooble_settings::slot_reset(void)
        << "dooble_settings.db"
        << "dooble_style_sheets.db";
 
-  for(const auto &i : list)
+  foreach(const auto &i, list)
     QFile::remove(setting("home_path").toString() +
 		  QDir::separator() +
 		  i);
@@ -3203,4 +3520,74 @@ void dooble_settings::slot_save_credentials(void)
 	  SLOT(slot_interrupt(void)));
   m_pbkdf2_dialog->exec();
   QApplication::processEvents();
+}
+
+void dooble_settings::slot_select_application_font(void)
+{
+  QFont font;
+  QFontDialog dialog(this);
+  auto string(m_ui.display_application_font->text());
+
+  if(!string.isEmpty() && font.fromString(string.remove('&')))
+    dialog.setCurrentFont(font);
+  else
+    dialog.setCurrentFont(dooble_application::font());
+
+  if(dialog.exec() == QDialog::Accepted)
+    {
+      QApplication::processEvents();
+      m_ui.display_application_font->setText
+	(dialog.selectedFont().toString().trimmed());
+    }
+}
+
+void dooble_settings::slot_web_engine_settings_item_changed
+(QTableWidgetItem *item)
+{
+  if(!item)
+    return;
+
+  if(Qt::ItemIsUserCheckable & item->flags())
+    {
+      auto string(item->data(Qt::UserRole).toString().trimmed());
+
+      if(!string.isEmpty())
+	{
+	  auto database_name(dooble_database_utilities::database_name());
+
+	  {
+	    auto db = QSqlDatabase::addDatabase("QSQLITE", database_name);
+
+	    db.setDatabaseName(setting("home_path").toString() +
+			       QDir::separator() +
+			       "dooble_settings.db");
+
+	    if(db.open())
+	      {
+		create_tables(db);
+
+		QSqlQuery query(db);
+
+		query.exec("PRAGMA synchronous = NORMAL");
+		query.prepare
+		  ("INSERT OR REPLACE INTO dooble_web_engine_settings "
+		   "(environment_variable, key, value) VALUES (?, ?, ?)");
+
+		if(s_web_engine_settings_environment.contains(string))
+		  query.addBindValue(1);
+		else
+		  query.addBindValue(0);
+
+		query.addBindValue(string);
+		query.addBindValue
+		  (item->checkState() == Qt::Unchecked ? "false" : "true");
+		query.exec();
+	      }
+
+	    db.close();
+	  }
+
+	  QSqlDatabase::removeDatabase(database_name);
+	}
+    }
 }

@@ -44,10 +44,11 @@ class dooble_cookies_window: public QMainWindow
 
  public:
   dooble_cookies_window(bool is_private, QWidget *parent);
+  bool is_domain_blocked(const QUrl &url) const;
   void filter(const QString &text);
   void populate(void);
-  void setCookieStore(QWebEngineCookieStore *cookie_store);
-  void setCookies(dooble_cookies *cookies);
+  void set_cookie_store(QWebEngineCookieStore *cookie_store);
+  void set_cookies(dooble_cookies *cookies);
   void show_normal(QWidget *parent);
 
  public slots:
@@ -65,15 +66,19 @@ class dooble_cookies_window: public QMainWindow
   QPointer<dooble_cookies> m_cookies;
   QTimer m_domain_filter_timer;
   QTimer m_purge_domains_timer;
+  QToolButton *m_collapse;
   Ui_dooble_cookies_window m_ui;
   bool m_is_private;
   void delete_top_level_items(const QList<QTreeWidgetItem *> &list);
   void save_settings(void);
 
  private slots:
+  void slot_add_blocked_domain(void);
+  void slot_block_subdomains(bool state);
+  void slot_collapse_all(void);
   void slot_cookie_removed(const QNetworkCookie &cookie);
   void slot_cookies_added(const QList<QNetworkCookie> &cookies,
-			  const QList<bool> &is_favorites);
+			  const QList<int> &is_blocked_or_favorite);
   void slot_cookies_cleared(void);
   void slot_delete_selected(void);
   void slot_delete_shown(void);

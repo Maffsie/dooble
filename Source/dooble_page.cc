@@ -32,6 +32,9 @@
 #include <QWebEngineFindTextResult>
 #endif
 #include <QWebEngineHistoryItem>
+#if (QT_VERSION >= QT_VERSION_CHECK(6, 2, 0))
+#include <QWebEngineLoadingInfo>
+#endif
 #include <QWebEngineProfile>
 #include <QWidgetAction>
 
@@ -49,6 +52,7 @@
 #include "dooble_history_window.h"
 #include "dooble_page.h"
 #include "dooble_popup_menu.h"
+#include "dooble_search_engines_popup.h"
 #include "dooble_style_sheet.h"
 #include "dooble_ui_utilities.h"
 #include "dooble_web_engine_page.h"
@@ -132,6 +136,10 @@ dooble_page::dooble_page(QWebEngineProfile *web_engine_profile,
 	  SIGNAL(started(void)),
 	  this,
 	  SLOT(slot_downloads_started(void)));
+  connect(dooble::s_settings,
+	  SIGNAL(applied(void)),
+	  m_popup_menu,
+	  SLOT(slot_settings_applied(void)));
   connect(dooble::s_settings,
 	  SIGNAL(applied(void)),
 	  this,
@@ -410,6 +418,16 @@ dooble_page::dooble_page(QWebEngineProfile *web_engine_profile,
 	  this,
 	  SLOT(slot_link_hovered(const QString &)));
   connect(m_view->page(),
+	  SIGNAL(loading(const QUrl &)),
+	  this,
+	  SLOT(slot_loading(const QUrl &)));
+#if (QT_VERSION >= QT_VERSION_CHECK(6, 2, 0))
+  connect(m_view->page(),
+	  SIGNAL(loadingChanged(const QWebEngineLoadingInfo &)),
+	  this,
+	  SLOT(slot_loading_changed(const QWebEngineLoadingInfo &)));
+#endif
+  connect(m_view->page(),
 	  SIGNAL(proxyAuthenticationRequired(const QUrl &,
 					     QAuthenticator *,
 					     const QString &)),
@@ -436,6 +454,8 @@ dooble_page::dooble_page(QWebEngineProfile *web_engine_profile,
   m_progress_label = new QLabel(m_ui.frame);
   m_progress_label->setAlignment(Qt::AlignLeft | Qt::AlignVCenter);
   m_progress_label->setIndent(5);
+  m_progress_label->setMinimumHeight
+    (10 + m_progress_label->sizeHint().height());
   m_progress_label->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
   m_progress_label->setStyleSheet("QLabel {background-color: #e0e0e0;}");
   m_progress_label->setVisible(false);
@@ -445,17 +465,17 @@ dooble_page::dooble_page(QWebEngineProfile *web_engine_profile,
   prepare_tool_buttons();
   m_view->setZoomFactor(zoom_factor);
   prepare_zoom_toolbutton(zoom_factor);
-  emit zoomed(m_view->zoomFactor());
   slot_dooble_credentials_created();
+  QTimer::singleShot(1000, this, SLOT(slot_zoomed(void)));
 }
 
 dooble_page::~dooble_page()
 {
-  for(const auto &view : m_last_javascript_popups)
+  foreach(const auto &view, m_last_javascript_popups)
     if(view && view->parent() == this)
       view->deleteLater();
 
-  for(auto shortcut : m_shortcuts)
+  foreach(auto shortcut, m_shortcuts)
     delete shortcut;
 }
 
@@ -816,7 +836,8 @@ void dooble_page::prepare_shortcuts(void)
 
 void dooble_page::prepare_standard_menus(void)
 {
-  m_menu->clear();
+  if(!m_menu->actions().isEmpty())
+    return;
 
   QAction *action = nullptr;
   QMenu *menu = nullptr;
@@ -1072,9 +1093,12 @@ void dooble_page::prepare_standard_menus(void)
 		  this,
 		  SLOT(slot_inject_custom_css(void)));
   menu->addSeparator();
-  menu->addAction(tr("Page Floating &Menu..."),
-		  this,
-		  SIGNAL(show_floating_menu(void)));
+  menu->addAction
+    (QIcon::fromTheme(use_material_icons + "application-menu",
+		      QIcon(QString(":/%1/36/menu.png").arg(icon_set))),
+     tr("Page Floating &Menu..."),
+     this,
+     SIGNAL(show_floating_menu(void)));
   menu->addSeparator();
   menu->addAction(tr("&Search Engines..."),
 		  this,
@@ -1088,7 +1112,7 @@ void dooble_page::prepare_standard_menus(void)
   m_full_screen_action = menu->addAction(tr("Show &Full Screen"),
 					 this,
 					 SIGNAL(show_full_screen(void)),
-					 QKeySequence(tr("F11")));
+					 QKeySequence(Qt::Key_F11));
   menu->addSeparator();
   action = menu->addAction(tr("&Status Bar"),
 			   this,
@@ -1457,7 +1481,7 @@ void dooble_page::slot_always_allow_javascript_popup(void)
   prepare_progress_label_position();
   QApplication::setOverrideCursor(QCursor(Qt::WaitCursor));
 
-  for(const auto &view : m_last_javascript_popups)
+  foreach(const auto &view, m_last_javascript_popups)
     if(view && view->parent() == this)
       emit create_dialog(view);
 
@@ -1520,7 +1544,7 @@ void dooble_page::slot_close_javascript_popup_exception_frame(void)
   prepare_progress_label_position();
   QApplication::setOverrideCursor(QCursor(Qt::WaitCursor));
 
-  for(const auto &view : m_last_javascript_popups)
+  foreach(const auto &view, m_last_javascript_popups)
     if(view && view->parent() == this)
       view->deleteLater();
 
@@ -1534,8 +1558,11 @@ void dooble_page::slot_create_dialog_request(dooble_web_engine_view *view)
     {
       if(!m_last_javascript_popups.contains(view))
 	{
-	  if(dooble_page::ConstantsEnum::MAXIMUM_JAVASCRIPT_POPUPS <=
-	     m_last_javascript_popups.size())
+	  auto size = m_last_javascript_popups.size();
+
+	  if(size >=
+	     static_cast<decltype(size)> (dooble_page::ConstantsEnum::
+					  MAXIMUM_JAVASCRIPT_POPUPS))
 	    {
 	      view->deleteLater();
 	      return;
@@ -1584,10 +1611,13 @@ void dooble_page::slot_dooble_credentials_authenticated(bool state)
 	m_authentication_action->setEnabled
 	  (dooble_settings::has_dooble_credentials());
     }
+
+  m_menu->clear();
 }
 
 void dooble_page::slot_dooble_credentials_created(void)
 {
+  m_menu->clear();
 }
 
 void dooble_page::slot_downloads_finished(void)
@@ -1620,6 +1650,11 @@ void dooble_page::slot_downloads_started(void)
       (QIcon::fromTheme(use_material_icons + "folder-download",
 			QIcon(QString(":/%1/36/downloads_active.png").
 			      arg(icon_set))));
+}
+
+void dooble_page::slot_enable_javascript(void)
+{
+  enable_web_setting(QWebEngineSettings::JavascriptEnabled, true);
 }
 
 void dooble_page::slot_escape(void)
@@ -2004,6 +2039,12 @@ void dooble_page::slot_link_hovered(const QString &url)
 {
   if(url.trimmed().isEmpty())
     {
+      if(!property("is_loading").toBool())
+	{
+	  m_progress_label->clear();
+	  m_progress_label->setVisible(false);
+	}
+
       m_ui.link_hovered->setProperty("text", "");
       m_ui.link_hovered->clear();
       return;
@@ -2032,6 +2073,18 @@ void dooble_page::slot_link_hovered(const QString &url)
 		    qAbs(width() - difference)));
       m_ui.link_hovered->setCursorPosition(0);
     }
+  else if(!property("is_loading").toBool())
+    {
+      auto font_metrics(m_progress_label->fontMetrics());
+
+      m_progress_label->setText
+	(font_metrics.
+	 elidedText(url.trimmed(), Qt::ElideMiddle, qAbs(width() - 15)));
+      m_progress_label->resize
+	(QSize(m_progress_label->sizeHint().width() + 5,
+	       m_progress_label->sizeHint().height()));
+      m_progress_label->setVisible(true);
+    }
 }
 
 void dooble_page::slot_load_finished(bool ok)
@@ -2039,6 +2092,7 @@ void dooble_page::slot_load_finished(bool ok)
   Q_UNUSED(ok);
   dooble_style_sheet::inject
     (qobject_cast<dooble_web_engine_page *> (m_view->page()));
+  setProperty("is_loading", false);
 
   /*
   ** Do not save the favicon. The current page's favicon and the page's
@@ -2058,6 +2112,8 @@ void dooble_page::slot_load_finished(bool ok)
       m_ui.address->setFocus();
     }
 
+  m_progress_label->clear();
+  m_progress_label->setVisible(false);
   m_ui.progress->setVisible(false);
 
   auto icon_set(dooble_settings::setting("icon_set").toString());
@@ -2069,16 +2125,77 @@ void dooble_page::slot_load_finished(bool ok)
   m_ui.reload->setToolTip(tr("Reload"));
   emit iconChanged(icon());
   emit titleChanged(title());
+
+  if(dooble_settings::setting("temporarily_disable_javascript", false).toBool())
+    {
+      auto javascript_enabled = true;
+      auto settings = m_view->settings();
+
+      if(settings)
+	javascript_enabled = settings->testAttribute
+	  (QWebEngineSettings::JavascriptEnabled);
+
+      enable_web_setting(QWebEngineSettings::JavascriptEnabled, false);
+
+      if(javascript_enabled)
+	QTimer::singleShot(100, this, SLOT(slot_enable_javascript(void)));
+    }
 }
 
 void dooble_page::slot_load_page(void)
 {
-  load(QUrl::fromUserInput(m_ui.address->text().trimmed()));
+  auto str(m_ui.address->text().trimmed());
+  auto url((QUrl(str))); // Special parentheses for compilers.
+
+  if((!url.isValid() ||
+      str.contains(' ') ||
+      str.contains('\t') ||
+      url.scheme().isEmpty()) &&
+     dooble::s_search_engines_window)
+    {
+      if(str.contains(' ') || str.contains('\t'))
+	{
+	search_label:
+
+	  auto url
+	    (dooble::s_search_engines_window->default_address_bar_engine_url());
+
+	  if(!url.isEmpty() && url.isValid())
+	    {
+	      url.setQuery(url.query().append(QString("%1").arg(str)));
+	      load(url);
+	      return;
+	    }
+	  else // Prevent an endless loop.
+	    {
+	      load(QUrl::fromUserInput(str));
+	      return;
+	    }
+	}
+
+      auto index = str.lastIndexOf('.');
+
+      if(index < str.size() && index > -1)
+	if(str.at(index + 1).isLetterOrNumber())
+	  {
+	    url = QUrl::fromUserInput(str);
+
+	    if(!url.isValid() || url.scheme().isEmpty())
+	      goto search_label;
+
+	    goto done_label;
+	  }
+
+      goto search_label;
+    }
+
+ done_label:
+  load(url);
 }
 
 void dooble_page::slot_load_progress(int progress)
 {
-  m_progress_label->setVisible(progress < 1);
+  m_progress_label->setVisible(progress > 0 && progress < 100);
   m_ui.backward->setEnabled(m_view->history()->canGoBack());
   m_ui.forward->setEnabled(m_view->history()->canGoForward());
   m_ui.progress->setValue(progress);
@@ -2090,23 +2207,29 @@ void dooble_page::slot_load_progress(int progress)
     m_ui.address->setPalette(s_address_palette);
   else if(progress < 100)
     {
-      QLinearGradient linear_gradient
-	(0,
-	 m_ui.address->height(),
-	 m_ui.address->width(),
-	 m_ui.address->height());
+      if(dooble_settings::setting("show_loading_gradient").toBool())
+	{
+	  QLinearGradient linear_gradient
+	    (0,
+	     m_ui.address->height(),
+	     m_ui.address->width(),
+	     m_ui.address->height());
 
-      linear_gradient.setColorAt(progress / 100.0, QColor(144, 238, 144));
-      linear_gradient.setColorAt
-	(qBound(progress / 100.0, progress / 100.0 + 0.15, 1.0),
-	 QColor(Qt::white));
+	  linear_gradient.setColorAt(progress / 100.0, QColor(144, 238, 144));
+	  linear_gradient.setColorAt
+	    (qBound(progress / 100.0, progress / 100.0 + 0.15, 1.0),
+	     QColor(Qt::white));
 
-      auto palette(m_ui.address->palette());
+	  auto palette(m_ui.address->palette());
 
-      palette.setBrush(m_ui.address->backgroundRole(), QBrush(linear_gradient));
-      m_ui.address->setPalette(palette);
+	  palette.setBrush
+	    (m_ui.address->backgroundRole(), QBrush(linear_gradient));
+	  m_ui.address->setPalette(palette);
+	}
+      else if(m_ui.address->palette() != s_address_palette)
+	m_ui.address->setPalette(s_address_palette);
     }
-  else
+  else if(m_ui.address->palette() != s_address_palette)
     m_ui.address->setPalette(s_address_palette);
 #endif
 }
@@ -2115,22 +2238,31 @@ void dooble_page::slot_load_started(void)
 {
   emit iconChanged(QIcon());
   QApplication::setOverrideCursor(QCursor(Qt::WaitCursor));
+  setProperty("is_loading", true);
 
-  for(const auto &view : m_last_javascript_popups)
+  foreach(const auto &view, m_last_javascript_popups)
     if(view && view->parent() == this)
       view->deleteLater();
 
   m_last_javascript_popups.clear();
   QApplication::restoreOverrideCursor();
-  m_progress_label->setVisible(true);
 
   if(url().host().isEmpty())
     m_progress_label->setText(tr("Waiting for page..."));
   else
-    m_progress_label->setText(tr("Waiting for %1...").arg(url().host()));
+    {
+      auto url_1(QUrl::fromUserInput(m_ui.address->text()));
+      auto url_2(url());
+
+      if(url_1.host() != url_2.host())
+	m_progress_label->setText(tr("Loading %1...").arg(url_1.host()));
+      else
+	m_progress_label->setText(tr("Loading %1...").arg(url_2.host()));
+    }
 
   m_progress_label->resize(QSize(m_progress_label->sizeHint().width() + 5,
 				 m_progress_label->sizeHint().height()));
+  m_progress_label->setVisible(true);
   m_ui.feature_permission_popup_message->setVisible(false);
   m_ui.javascript_popup_message->setVisible(false);
   prepare_progress_label_position();
@@ -2142,13 +2274,36 @@ void dooble_page::slot_load_started(void)
   m_ui.reload->setToolTip(tr("Stop Page Load"));
 }
 
+void dooble_page::slot_loading(const QUrl &url)
+{
+  if(url.host().isEmpty())
+    return;
+
+  m_progress_label->setText(tr("Loading %1...").arg(url.host()));
+  m_progress_label->resize
+    (QSize(m_progress_label->sizeHint().width() + 5,
+	   m_progress_label->sizeHint().height()));
+  m_progress_label->setVisible(true);
+  prepare_progress_label_position();
+
+  if(!property("is_loading").toBool())
+    QTimer::singleShot(2500, m_progress_label, SLOT(hide(void)));
+}
+
+#if (QT_VERSION >= QT_VERSION_CHECK(6, 2, 0))
+void dooble_page::slot_loading_changed(const QWebEngineLoadingInfo &info)
+{
+  slot_loading(info.url());
+}
+#endif
+
 void dooble_page::slot_only_now_allow_javascript_popup(void)
 {
   m_ui.javascript_popup_message->setVisible(false);
   prepare_progress_label_position();
   QApplication::setOverrideCursor(QCursor(Qt::WaitCursor));
 
-  for(const auto &view : m_last_javascript_popups)
+  foreach(const auto &view, m_last_javascript_popups)
     if(view && view->parent() == this)
       emit create_dialog(view);
 
@@ -2176,7 +2331,8 @@ void dooble_page::slot_prepare_backward_menu(void)
   QFontMetrics font_metrics(m_ui.backward->menu()->font());
   auto items
     (m_view->history()->
-     backItems(dooble_page::ConstantsEnum::MAXIMUM_HISTORY_ITEMS));
+     backItems(static_cast<int> (dooble_page::ConstantsEnum::
+				 MAXIMUM_HISTORY_ITEMS)));
 
   m_ui.backward->setEnabled(!items.empty());
 
@@ -2208,7 +2364,8 @@ void dooble_page::slot_prepare_forward_menu(void)
   QFontMetrics font_metrics(m_ui.forward->menu()->font());
   auto items
     (m_view->history()->
-     forwardItems(dooble_page::ConstantsEnum::MAXIMUM_HISTORY_ITEMS));
+     forwardItems(static_cast<int> (dooble_page::ConstantsEnum::
+				    MAXIMUM_HISTORY_ITEMS)));
 
   m_ui.forward->setEnabled(!items.empty());
 
@@ -2336,6 +2493,8 @@ void dooble_page::slot_render_pixmap(void)
 
 void dooble_page::slot_settings_applied(void)
 {
+  m_menu->clear();
+
   if(dooble_settings::setting("denote_private_widgets").toBool())
     m_ui.is_private->setVisible(m_is_private);
   else
@@ -2462,7 +2621,10 @@ void dooble_page::slot_show_web_settings_panel(void)
 
 void dooble_page::slot_url_changed(const QUrl &url)
 {
-  if(url.toString().length() > dooble::Limits::MAXIMUM_URL_LENGTH)
+  auto length = url.toString().length();
+
+  if(length >
+     static_cast<decltype(length)> (dooble::Limits::MAXIMUM_URL_LENGTH))
     return;
 
   /*
@@ -2495,6 +2657,11 @@ void dooble_page::slot_zoom_reset(void)
 {
   m_view->setZoomFactor(1.0);
   prepare_zoom_toolbutton(1.0);
+  emit zoomed(m_view->zoomFactor());
+}
+
+void dooble_page::slot_zoomed(void)
+{
   emit zoomed(m_view->zoomFactor());
 }
 

@@ -82,6 +82,10 @@ dooble_address_widget_completer::dooble_address_widget_completer
 	  SIGNAL(history_cleared(void)),
 	  this,
 	  SLOT(slot_history_cleared(void)));
+  connect(dooble::s_settings,
+	  SIGNAL(applied(void)),
+	  this,
+	  SLOT(slot_settings_applied(void)));
   connect(qobject_cast<dooble_address_widget *> (parent),
 	  SIGNAL(returnPressed(void)),
 	  &m_text_edited_timer,
@@ -96,10 +100,10 @@ dooble_address_widget_completer::dooble_address_widget_completer
 	  SLOT(slot_clicked(const QModelIndex &)));
   setCaseSensitivity(Qt::CaseInsensitive);
   setCompletionMode(QCompleter::UnfilteredPopupCompletion);
-  setModel(m_model);
   setModelSorting(QCompleter::UnsortedModel);
   setPopup(m_popup);
   setWrapAround(false);
+  slot_settings_applied();
 }
 
 dooble_address_widget_completer::~dooble_address_widget_completer()
@@ -173,13 +177,19 @@ void dooble_address_widget_completer::add_item(const QIcon &icon,
   s_urls[url] = item;
 }
 
-void dooble_address_widget_completer::complete(void)
+void dooble_address_widget_completer::complete(const QRect &rect)
 {
-  complete("");
+  Q_UNUSED(rect);
+
+  if(dooble_settings::setting("show_address_widget_completer").toBool())
+    complete("");
 }
 
 void dooble_address_widget_completer::complete(const QString &text)
 {
+  if(!dooble_settings::setting("show_address_widget_completer").toBool())
+    return;
+
   QApplication::setOverrideCursor(QCursor(Qt::WaitCursor));
 
   QList<QStandardItem *> list;
@@ -194,7 +204,7 @@ void dooble_address_widget_completer::complete(const QString &text)
 	  {
 	    if(s_model->item(i, 0)->icon().isNull())
 	      s_model->item(i, 0)->setIcon
-		(dooble_favicons::icon(s_model->item(i, 0)->text()));
+		(dooble_favicons::icon_from_host(s_model->item(i, 0)->text()));
 
 	    list << s_model->item(i, 0);
 	  }
@@ -211,16 +221,17 @@ void dooble_address_widget_completer::complete(const QString &text)
 	      (levenshtein_distance(c, s_model->item(i, 0)->text().toLower()),
 	       s_model->item(i, 0));
 
-      list << map.values().mid(0, 2 * dooble_page::MAXIMUM_HISTORY_ITEMS);
+      list << map.values().mid
+	(0, 2 * static_cast<int> (dooble_page::MAXIMUM_HISTORY_ITEMS));
     }
 
   m_model->clear();
 
-  for(auto item : list)
+  foreach(auto item, list)
     if(item)
       {
 	if(item->icon().isNull())
-	  item->setIcon(dooble_favicons::icon(item->text()));
+	  item->setIcon(dooble_favicons::icon_from_host(item->text()));
 
 	m_model->setRowCount(m_model->rowCount() + 1);
 	m_model->setItem(m_model->rowCount() - 1, item->clone());
@@ -267,7 +278,7 @@ void dooble_address_widget_completer::set_item_icon(const QIcon &icon,
     if(list.at(0))
       {
 	if(icon.isNull())
-	  list.at(0)->setIcon(dooble_favicons::icon(url));
+	  list.at(0)->setIcon(dooble_favicons::icon_from_host(url));
 	else
 	  list.at(0)->setIcon(icon);
       }
@@ -288,9 +299,18 @@ void dooble_address_widget_completer::slot_history_cleared(void)
   s_urls.clear();
 }
 
+void dooble_address_widget_completer::slot_settings_applied(void)
+{
+  if(dooble_settings::setting("show_address_widget_completer").toBool())
+    setModel(m_model);
+  else
+    setModel(nullptr);
+}
+
 void dooble_address_widget_completer::slot_text_edited_timeout(void)
 {
-  if(!parent())
+  if(!dooble_settings::setting("show_address_widget_completer").toBool() ||
+     !parent())
     return;
 
   auto text(qobject_cast<dooble_address_widget *> (parent())->text());

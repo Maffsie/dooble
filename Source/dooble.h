@@ -54,6 +54,7 @@ class dooble_cookies_window;
 class dooble_cryptography;
 class dooble_downloads;
 class dooble_favorites_popup;
+class dooble_gopher;
 class dooble_history;
 class dooble_history_window;
 class dooble_page;
@@ -71,6 +72,7 @@ class dooble: public QMainWindow
   enum Limits
     {
      MAXIMUM_TITLE_LENGTH = 1024,
+     MAXIMUM_SQL_TEXT_LENGTH = 5000,
      MAXIMUM_URL_LENGTH = 2048
     };
 
@@ -94,6 +96,7 @@ class dooble: public QMainWindow
   static QPointer<dooble_cryptography> s_cryptography;
   static QPointer<dooble_downloads> s_downloads;
   static QPointer<dooble_favorites_popup> s_favorites_window;
+  static QPointer<dooble_gopher> s_gopher;
   static QPointer<dooble_history> s_history;
   static QPointer<dooble_history_window> s_history_popup;
   static QPointer<dooble_history_window> s_history_window;
@@ -130,6 +133,7 @@ class dooble: public QMainWindow
   QHash<QTimer *, QShortcut *> m_disabled_shortcuts;
 #endif
   QList<QPair<QPointer<dooble_page>, QUrl> > m_delayed_pages;
+  QList<QPointer<QAction> > m_standard_menu_actions;
   QList<QShortcut *> m_shortcuts;
   QList<QShortcut *> m_tab_widget_shortcuts;
   QMenu *m_menu;
@@ -197,6 +201,7 @@ class dooble: public QMainWindow
   void slot_create_window(dooble_web_engine_view *view);
   void slot_decouple_tab(int index);
   void slot_dooble_credentials_authenticated(bool state);
+  void slot_dooble_credentials_created(void);
   void slot_downloads_started(void);
 #ifdef Q_OS_MAC
   void slot_enable_shortcut(void);

@@ -67,10 +67,13 @@ class dooble_settings: public dooble_main_window
   static bool has_dooble_credentials_temporary(void);
   static bool set_setting(const QString &key, const QVariant &value);
   static bool site_has_javascript_block_popup_exception(const QUrl &url);
+  static int main_menu_bar_visible_key(void);
   static int site_feature_permission(const QUrl &url,
 				     QWebEnginePage::Feature feature);
+  static void prepare_web_engine_environment_variables(void);
   static void remove_setting(const QString &key);
   void restore(bool read_database);
+  void set_settings_path(const QString &path);
   void set_site_feature_permission(const QUrl &url,
 				   QWebEnginePage::Feature feature,
 				   bool state);
@@ -90,6 +93,7 @@ class dooble_settings: public dooble_main_window
   QFutureWatcher<QList<QByteArray> > m_pbkdf2_future_watcher;
   QPointer<QProgressDialog> m_pbkdf2_dialog;
   Ui_dooble_settings m_ui;
+  static QHash<QString, QString> s_web_engine_settings_environment;
   static QHash<QUrl, char> s_javascript_block_popup_exceptions;
   static QMap<QString, QVariant> s_getenv;
   static QMap<QString, QVariant> s_settings;
@@ -99,10 +103,12 @@ class dooble_settings: public dooble_main_window
   static QString s_http_user_agent;
   static void create_tables(QSqlDatabase &db);
   void new_javascript_block_popup_exception(const QUrl &url);
+  void prepare_application_fonts(void);
   void prepare_fonts(void);
   void prepare_icons(void);
   void prepare_proxy(bool save);
   void prepare_table_statistics(void);
+  void prepare_web_engine_settings(void);
   void purge_database_data(void);
   void purge_features_permissions(void);
   void purge_javascript_block_popup_exceptions(void);
@@ -131,6 +137,8 @@ class dooble_settings: public dooble_main_window
   void slot_reset_credentials(void);
   void slot_reset_user_agent(void);
   void slot_save_credentials(void);
+  void slot_select_application_font(void);
+  void slot_web_engine_settings_item_changed(QTableWidgetItem *item);
 
  signals:
   void applied(void);

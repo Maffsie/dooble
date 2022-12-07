@@ -27,6 +27,7 @@
 
 #include <QFileDialog>
 #include <QMessageBox>
+#include <QPainter>
 #include <QPointer>
 #include <QPrintDialog>
 #include <QPrintPreviewDialog>
@@ -49,6 +50,7 @@
 #include "dooble_downloads.h"
 #include "dooble_favicons.h"
 #include "dooble_favorites_popup.h"
+#include "dooble_gopher.h"
 #include "dooble_history.h"
 #include "dooble_history_window.h"
 #include "dooble_hmac.h"
@@ -80,6 +82,7 @@ QPointer<dooble_cookies_window> dooble::s_cookies_window = nullptr;
 QPointer<dooble_cryptography> dooble::s_cryptography = nullptr;
 QPointer<dooble_downloads> dooble::s_downloads = nullptr;
 QPointer<dooble_favorites_popup> dooble::s_favorites_window = nullptr;
+QPointer<dooble_gopher> dooble::s_gopher = nullptr;
 QPointer<dooble_history_window> dooble::s_history_popup = nullptr;
 QPointer<dooble_history_window> dooble::s_history_window = nullptr;
 QPointer<dooble_search_engines_popup> dooble::s_search_engines_window = nullptr;
@@ -155,16 +158,16 @@ dooble::dooble(const QList<QUrl> &urls, bool is_private):QMainWindow()
     {
       m_cookies = new dooble_cookies(m_is_private, this);
       m_cookies_window = new dooble_cookies_window(m_is_private, this);
-      m_cookies_window->setCookies(m_cookies);
+      m_cookies_window->set_cookies(m_cookies);
       m_downloads = new dooble_downloads
 	(m_web_engine_profile = new QWebEngineProfile(this), this);
       prepare_private_web_engine_profile_settings();
       connect(m_cookies,
 	      SIGNAL(cookies_added(const QList<QNetworkCookie> &,
-				   const QList<bool> &)),
+				   const QList<int> &)),
 	      m_cookies_window,
 	      SLOT(slot_cookies_added(const QList<QNetworkCookie> &,
-				      const QList<bool> &)));
+				      const QList<int> &)));
       connect(m_cookies,
 	      SIGNAL(cookie_removed(const QNetworkCookie &)),
 	      m_cookies_window,
@@ -181,12 +184,16 @@ dooble::dooble(const QList<QUrl> &urls, bool is_private):QMainWindow()
 	      SIGNAL(cookieRemoved(const QNetworkCookie &)),
 	      m_cookies,
 	      SLOT(slot_cookie_removed(const QNetworkCookie &)));
-      m_cookies_window->setCookieStore(m_web_engine_profile->cookieStore());
-
+      m_cookies_window->set_cookie_store(m_web_engine_profile->cookieStore());
       m_web_engine_profile->cookieStore()->setCookieFilter
-	([](const QWebEngineCookieStore::FilterRequest &filter_request)
+	([this](const QWebEngineCookieStore::FilterRequest &filter_request)
 	 {
-	   if(filter_request.thirdParty)
+	   if(dooble_settings::setting("block_third_party_cookies").toBool() &&
+	      filter_request.thirdParty)
+	     return false;
+	   else if(m_cookies_window->is_domain_blocked(filter_request.
+						       firstPartyUrl) ||
+		   m_cookies_window->is_domain_blocked(filter_request.origin))
 	     return false;
 	   else
 	     return true;
@@ -203,7 +210,7 @@ dooble::dooble(const QList<QUrl> &urls, bool is_private):QMainWindow()
   if(urls.isEmpty())
     new_page(QUrl(), is_private);
   else
-    for(const auto &url : urls)
+    foreach(const auto &url, urls)
       new_page(url, is_private);
 
   if(!s_containers_populated)
@@ -291,7 +298,7 @@ dooble::dooble(dooble_web_engine_view *view):QMainWindow()
 
 dooble::~dooble()
 {
-  for(auto shortcut : m_shortcuts)
+  foreach(auto shortcut, m_shortcuts)
     if(shortcut)
       shortcut->deleteLater();
 
@@ -364,7 +371,7 @@ bool dooble::can_exit(const dooble::CanExit can_exit)
 	    auto found = false;
 	    auto list(QApplication::topLevelWidgets());
 
-	    for(auto i : list)
+	    foreach(auto i, list)
 	      {
 		auto d = qobject_cast<dooble *> (i);
 
@@ -392,7 +399,7 @@ bool dooble::can_exit(const dooble::CanExit can_exit)
 	auto found = false;
 	auto list(QApplication::topLevelWidgets());
 
-	for(auto i : list)
+	foreach(auto i, list)
 	  {
 	    auto d = qobject_cast<dooble *> (i);
 
@@ -438,14 +445,18 @@ bool dooble::can_exit(const dooble::CanExit can_exit)
 bool dooble::cookie_filter
 (const QWebEngineCookieStore::FilterRequest &filter_request)
 {
-  if(filter_request.thirdParty)
+  if(dooble_settings::setting("block_third_party_cookies").toBool() &&
+     filter_request.thirdParty)
     {
       emit s_accepted_or_blocked_domains->add_session_url
 	(filter_request.firstPartyUrl, filter_request.origin);
       return false;
     }
-
-  return true;
+  else if(s_cookies_window->is_domain_blocked(filter_request.firstPartyUrl) ||
+	  s_cookies_window->is_domain_blocked(filter_request.origin))
+    return false;
+  else
+    return true;
 }
 
 bool dooble::initialized(void) const
@@ -561,7 +572,7 @@ void dooble::closeEvent(QCloseEvent *event)
 
   auto list(QApplication::topLevelWidgets());
 
-  for(auto i : list)
+  foreach(auto i, list)
     if(i != this && qobject_cast<dooble *> (i))
       {
 	decouple_support_windows();
@@ -749,6 +760,10 @@ void dooble::connect_signals(void)
 	  this,
 	  SLOT(slot_settings_applied(void)),
 	  Qt::UniqueConnection);
+  connect(s_settings,
+	  SIGNAL(dooble_credentials_created(void)),
+	  this,
+	  SLOT(slot_dooble_credentials_created(void)));
   connect(this,
 	  SIGNAL(application_locked(bool, dooble *)),
 	  s_application,
@@ -819,13 +834,13 @@ void dooble::initialize_static_members(void)
 
   if(!s_accepted_or_blocked_domains)
     {
+      QWebEngineProfile::defaultProfile()->cookieStore()->setCookieFilter
+	(&dooble::cookie_filter);
       s_accepted_or_blocked_domains = new dooble_accepted_or_blocked_domains();
       connect(s_accepted_or_blocked_domains,
 	      SIGNAL(populated(void)),
 	      this,
 	      SLOT(slot_populated(void)));
-      QWebEngineProfile::defaultProfile()->cookieStore()->setCookieFilter
-	(&dooble::cookie_filter);
     }
 
   if(!s_certificate_exceptions)
@@ -849,9 +864,9 @@ void dooble::initialize_static_members(void)
   if(!s_cookies_window)
     {
       s_cookies_window = new dooble_cookies_window(false, nullptr);
-      s_cookies_window->setCookieStore
+      s_cookies_window->set_cookie_store
 	(QWebEngineProfile::defaultProfile()->cookieStore());
-      s_cookies_window->setCookies(s_cookies);
+      s_cookies_window->set_cookies(s_cookies);
     }
 
   if(!s_cryptography)
@@ -889,6 +904,9 @@ void dooble::initialize_static_members(void)
 	      s_favorites_window,
 	      SLOT(slot_favorites_sorted(void)));
     }
+
+  if(!s_gopher)
+    s_gopher = new dooble_gopher(nullptr);
 
   if(!s_history)
     {
@@ -959,6 +977,9 @@ void dooble::initialize_static_members(void)
 
 void dooble::keyPressEvent(QKeyEvent *event)
 {
+  if(dooble_settings::main_menu_bar_visible_key() == event->key())
+    slot_show_main_menu();
+
   QMainWindow::keyPressEvent(event);
 }
 
@@ -1006,10 +1027,12 @@ void dooble::new_page(dooble_page *page)
   */
 
   auto title
-    (page->title().trimmed().mid(0, dooble::Limits::MAXIMUM_TITLE_LENGTH));
+    (page->title().trimmed().mid
+     (0, static_cast<int> (dooble::Limits::MAXIMUM_TITLE_LENGTH)));
 
   if(title.isEmpty())
-    title = page->url().toString().mid(0, dooble::Limits::MAXIMUM_URL_LENGTH);
+    title = page->url().toString().mid
+      (0, static_cast<int> (dooble::Limits::MAXIMUM_URL_LENGTH));
 
   if(title.isEmpty())
     title = tr("New Tab");
@@ -1054,9 +1077,6 @@ void dooble::new_page(dooble_page *page)
 
 void dooble::new_page(dooble_web_engine_view *view)
 {
-  if(view)
-    view->setVisible(true);
-
   auto page = new dooble_page
     (view ? view->web_engine_profile() : m_web_engine_profile.data(),
      view,
@@ -1065,10 +1085,12 @@ void dooble::new_page(dooble_web_engine_view *view)
   prepare_page_connections(page);
 
   auto title
-    (page->title().trimmed().mid(0, dooble::Limits::MAXIMUM_TITLE_LENGTH));
+    (page->title().trimmed().mid
+     (0, static_cast<int> (dooble::Limits::MAXIMUM_TITLE_LENGTH)));
 
   if(title.isEmpty())
-    title = page->url().toString().mid(0, dooble::Limits::MAXIMUM_URL_LENGTH);
+    title = page->url().toString().mid
+      (0, static_cast<int> (dooble::Limits::MAXIMUM_URL_LENGTH));
 
   if(title.isEmpty())
     title = tr("New Tab");
@@ -1089,6 +1111,9 @@ void dooble::new_page(dooble_web_engine_view *view)
       m_ui.tab->addTab(page, title.replace("&", "&&"));
       m_ui.tab->setTabToolTip(m_ui.tab->indexOf(page), title);
     }
+
+  if(view)
+    view->setVisible(true);
 
   if(m_anonymous_tab_headers || s_application->application_locked())
     m_ui.tab->setTabIcon
@@ -1150,7 +1175,7 @@ void dooble::open_tab_as_new_window(bool is_private, int index)
 
 void dooble::prepare_control_w_shortcut(void)
 {
-  for(auto shortcut : m_shortcuts)
+  foreach(auto shortcut, m_shortcuts)
     if(shortcut)
 #if (QT_VERSION < QT_VERSION_CHECK(6, 0, 0))
       if(QKeySequence(Qt::ControlModifier + Qt::Key_W) == shortcut->key())
@@ -1710,15 +1735,12 @@ void dooble::prepare_shortcuts(void)
       m_shortcuts << new QShortcut(QKeySequence(tr("Ctrl+W")),
 				   this,
 				   SLOT(slot_close_tab(void)));
-      m_shortcuts << new QShortcut(QKeySequence(tr("F10")),
-				   this,
-				   SLOT(slot_show_main_menu(void)));
-      m_shortcuts << new QShortcut(QKeySequence(tr("F11")),
+      m_shortcuts << new QShortcut(QKeySequence(Qt::Key_F11),
 				   this,
 				   SLOT(slot_show_full_screen(void)));
 
 #ifdef Q_OS_MACOS
-      for(auto shortcut : m_shortcuts)
+      foreach(auto shortcut, m_shortcuts)
 	connect(shortcut,
 		SIGNAL(activated(void)),
 		this,
@@ -1731,12 +1753,18 @@ void dooble::prepare_shortcuts(void)
 
 void dooble::prepare_standard_menus(void)
 {
-  m_menu->clear();
+  auto is_chart = qobject_cast<dooble_charts *> (m_ui.tab->currentWidget());
+
+  foreach(const auto action, m_standard_menu_actions)
+    if(action)
+      action->setEnabled(is_chart);
+
+  if(!m_menu->actions().isEmpty())
+    return;
 
   QAction *action = nullptr;
   QMenu *menu = nullptr;
   auto icon_set(dooble_settings::setting("icon_set").toString());
-  auto is_chart = qobject_cast<dooble_charts *> (m_ui.tab->currentWidget());
   auto page = current_page();
   auto use_material_icons(dooble_settings::use_material_icons());
 
@@ -1801,30 +1829,38 @@ void dooble::prepare_standard_menus(void)
 		  SLOT(close(void)),
 		  QKeySequence(tr("Ctrl+Shift+W")));
   menu->addSeparator();
-  menu->addAction
+  action = menu->addAction
     (QIcon::fromTheme(use_material_icons + "document-export",
 		      QIcon(QString(":/%1/48/export.png").arg(icon_set))),
      tr("&Export As PNG..."),
      this,
-     SLOT(slot_export_as_png(void)))->setEnabled(is_chart);
-  menu->addAction
+     SLOT(slot_export_as_png(void)));
+  action->setEnabled(is_chart);
+  m_standard_menu_actions << action;
+  action = menu->addAction
     (QIcon::fromTheme(use_material_icons + "document-save",
 		      QIcon(QString(":/%1/48/save.png").arg(icon_set))),
      tr("&Save"),
      this,
      SLOT(slot_save(void)),
-     QKeySequence(tr("Ctrl+S")))->setEnabled(is_chart);
+     QKeySequence(tr("Ctrl+S")));
+  action->setEnabled(is_chart);
+  m_standard_menu_actions << action;
   menu->addSeparator();
-  menu->addAction
+  action = menu->addAction
     (QIcon::fromTheme(use_material_icons + "document-print",
 		      QIcon(QString(":/%1/48/print.png").arg(icon_set))),
      tr("&Print..."),
      this,
      SLOT(slot_print(void)),
-     QKeySequence(tr("Ctrl+P")))->setEnabled(is_chart);
-  menu->addAction(tr("Print Pre&view..."),
-		  this,
-		  SLOT(slot_print_preview(void)))->setEnabled(is_chart);
+     QKeySequence(tr("Ctrl+P")));
+  action->setEnabled(is_chart);
+  m_standard_menu_actions << action;
+  action = menu->addAction(tr("Print Pre&view..."),
+			   this,
+			   SLOT(slot_print_preview(void)));
+  action->setEnabled(is_chart);
+  m_standard_menu_actions << action;
   menu->addSeparator();
   menu->addAction(QIcon::fromTheme(use_material_icons + "application-exit",
 				   QIcon(QString(":/%1/48/exit_dooble.png").
@@ -1991,7 +2027,7 @@ void dooble::prepare_standard_menus(void)
   m_full_screen_action = menu->addAction(tr("Show &Full Screen"),
 					 this,
 					 SLOT(slot_show_full_screen(void)),
-					 QKeySequence(tr("F11")));
+					 QKeySequence(Qt::Key_F11));
 
   /*
   ** Help Menu
@@ -2084,7 +2120,7 @@ void dooble::prepare_tab_icons_text_tool_tips(void)
 
 void dooble::prepare_tab_shortcuts(void)
 {
-  for(auto tab_widget_shortcut : m_tab_widget_shortcuts)
+  foreach(auto tab_widget_shortcut, m_tab_widget_shortcuts)
     if(tab_widget_shortcut)
       tab_widget_shortcut->deleteLater();
 
@@ -2489,7 +2525,9 @@ void dooble::slot_about_to_show_history_menu(void)
 
   QFontMetrics font_metrics(m_ui.menu_history->font());
   auto icon_set(dooble_settings::setting("icon_set").toString());
-  auto list(s_history->last_n_actions(5 + dooble_page::MAXIMUM_HISTORY_ITEMS));
+  auto list
+    (s_history->last_n_actions(5 + static_cast<int> (dooble_page::
+						     MAXIMUM_HISTORY_ITEMS)));
   auto sub_menu = new QMenu(tr("Charts"));
   auto use_material_icons(dooble_settings::use_material_icons());
 
@@ -2508,7 +2546,7 @@ void dooble::slot_about_to_show_history_menu(void)
       {
 	std::sort(list.begin(), list.end());
 
-	for(const auto &i : list)
+	foreach(const auto &i, list)
 	  {
 	    auto action = new QAction(i, this);
 
@@ -2537,7 +2575,7 @@ void dooble::slot_about_to_show_history_menu(void)
   if(!list.isEmpty())
     m_ui.menu_history->addSeparator();
 
-  for(auto i : list)
+  foreach(auto i, list)
     {
       connect(i,
 	      SIGNAL(triggered(void)),
@@ -2580,9 +2618,9 @@ void dooble::slot_about_to_show_main_menu(void)
 
       if(m && m->actions().size() >= 5)
 	{
-	  if(m_ui.menu_edit == menu && m->actions()[1]->menu())
-	    m_ui.menu_edit->addActions(m->actions()[1]->menu()->actions());
-	  else if(m_ui.menu_file == menu && m->actions()[1]->menu())
+	  if(m_ui.menu_edit == menu && m->actions().at(1)->menu())
+	    m_ui.menu_edit->addActions(m->actions().at(1)->menu()->actions());
+	  else if(m_ui.menu_file == menu && m->actions().at(1)->menu())
 	    {
 	      m_ui.menu_file->addActions(m->actions()[0]->menu()->actions());
 
@@ -2591,13 +2629,13 @@ void dooble::slot_about_to_show_main_menu(void)
 	      else if(m_action_close_tab)
 		m_action_close_tab->setEnabled(tabs_closable());
 	    }
-	  else if(m_ui.menu_help == menu && m->actions()[4]->menu())
-	    m_ui.menu_help->addActions(m->actions()[4]->menu()->actions());
-	  else if(m_ui.menu_tools == menu && m->actions()[2]->menu())
-	    m_ui.menu_tools->addActions(m->actions()[2]->menu()->actions());
-	  else if(m_ui.menu_view == menu && m->actions()[3]->menu())
+	  else if(m_ui.menu_help == menu && m->actions().at(4)->menu())
+	    m_ui.menu_help->addActions(m->actions().at(4)->menu()->actions());
+	  else if(m_ui.menu_tools == menu && m->actions().at(2)->menu())
+	    m_ui.menu_tools->addActions(m->actions().at(2)->menu()->actions());
+	  else if(m_ui.menu_view == menu && m->actions().at(3)->menu())
 	    {
-	      m_ui.menu_view->addActions(m->actions()[3]->menu()->actions());
+	      m_ui.menu_view->addActions(m->actions().at(3)->menu()->actions());
 
 	      if(page && page->full_screen_action())
 		{
@@ -2702,11 +2740,11 @@ void dooble::slot_anonymous_tab_headers(bool state)
 	  {
 	    auto text
 	      (page->title().trimmed().
-	       mid(0, dooble::Limits::MAXIMUM_TITLE_LENGTH));
+	       mid(0, static_cast<int> (dooble::Limits::MAXIMUM_TITLE_LENGTH)));
 
 	    if(text.isEmpty())
 	      text = page->url().toString().mid
-		(0, dooble::Limits::MAXIMUM_URL_LENGTH);
+		(0, static_cast<int> (dooble::Limits::MAXIMUM_URL_LENGTH));
 
 	    if(text.isEmpty())
 	      text = tr("Dooble");
@@ -2799,7 +2837,7 @@ void dooble::slot_application_locked(bool state, dooble *d)
  unlock_label:
   QApplication::setOverrideCursor(QCursor(Qt::WaitCursor));
 
-  for(auto shortcut : m_shortcuts)
+  foreach(auto shortcut, m_shortcuts)
     if(shortcut)
       {
 #if (QT_VERSION < QT_VERSION_CHECK(6, 0, 0))
@@ -2872,11 +2910,12 @@ void dooble::slot_application_locked(bool state, dooble *d)
 	    {
 	      auto title
 		(page->title().
-		 trimmed().mid(0, dooble::Limits::MAXIMUM_TITLE_LENGTH));
+		 trimmed().mid
+		 (0, static_cast<int> (dooble::Limits::MAXIMUM_TITLE_LENGTH)));
 
 	      if(title.isEmpty())
 		title = page->url().toString().mid
-		  (0, dooble::Limits::MAXIMUM_URL_LENGTH);
+		  (0, static_cast<int> (dooble::Limits::MAXIMUM_URL_LENGTH));
 
 	      if(title.isEmpty())
 		title = tr("about:blank");
@@ -3238,6 +3277,15 @@ void dooble::slot_dooble_credentials_authenticated(bool state)
 	m_authentication_action->setEnabled
 	  (dooble_settings::has_dooble_credentials());
     }
+
+  m_menu->clear();
+  m_standard_menu_actions.clear();
+}
+
+void dooble::slot_dooble_credentials_created(void)
+{
+  m_menu->clear();
+  m_standard_menu_actions.clear();
 }
 
 void dooble::slot_downloads_started(void)
@@ -3280,7 +3328,7 @@ void dooble::slot_export_as_png(void)
       auto chart = qobject_cast<dooble_charts *> (m_ui.tab->currentWidget());
       auto file_name(dialog.selectedFiles().value(0));
 
-      if(!file_name.toLower().endsWith(".png"))
+      if(!file_name.endsWith(".png", Qt::CaseInsensitive))
 	file_name.append(".png");
 
       if(chart)
@@ -3326,10 +3374,18 @@ void dooble::slot_floating_digital_dialog_timeout(void)
   font.setPointSize(25);
   m_floating_digital_clock_ui.clock->repaint();
   m_floating_digital_clock_ui.clock->setFont(font);
-  m_floating_digital_clock_ui.clock->setText
-    (QString("%1%2").
-     arg(now.time().toString("hh:mm:ss A")).
-     arg(utc == ":utc" ? " UTC" : ""));
+
+  if(m_floating_digital_clock_ui.hour_24->isChecked())
+    m_floating_digital_clock_ui.clock->setText
+      (QString("%1%2").
+       arg(now.time().toString("hh:mm:ss")).
+       arg(utc == ":utc" ? " UTC" : ""));
+  else
+    m_floating_digital_clock_ui.clock->setText
+      (QString("%1%2").
+       arg(now.time().toString("hh:mm:ss A")).
+       arg(utc == ":utc" ? " UTC" : ""));
+
   m_floating_digital_clock_ui.clock->update();
   font = m_floating_digital_clock_ui.date->font();
   font.setPointSize(15);
@@ -3353,7 +3409,7 @@ void dooble::slot_history_action_triggered(void)
 
 void dooble::slot_history_favorites_populated(void)
 {
-  for(const auto &pair : m_delayed_pages)
+  foreach(const auto &pair, m_delayed_pages)
     if(pair.first)
       pair.first->load(pair.second);
 
@@ -3776,6 +3832,8 @@ void dooble::slot_set_current_tab(void)
 
 void dooble::slot_settings_applied(void)
 {
+  m_menu->clear();
+  m_standard_menu_actions.clear();
   m_ui.menu_bar->setVisible
     (dooble_settings::setting("main_menu_bar_visible").toBool());
   prepare_icons();
@@ -3917,6 +3975,8 @@ void dooble::slot_show_clear_items(void)
 {
   dooble_clear_items clear_items(this);
 
+  clear_items.resize
+    (clear_items.size().width(), clear_items.minimumSize().height());
   clear_items.exec();
   QApplication::processEvents();
 }
@@ -4043,6 +4103,9 @@ void dooble::slot_show_floating_digital_clock(void)
 	(Qt::WindowStaysOnTopHint |
 	 m_floating_digital_clock_dialog->windowFlags());
       m_floating_digital_clock_ui.setupUi(m_floating_digital_clock_dialog);
+      new QShortcut(QKeySequence(tr("Ctrl+W")),
+		    m_floating_digital_clock_dialog,
+		    SLOT(close(void)));
     }
 
   m_floating_digital_clock_dialog->repaint();
@@ -4346,8 +4409,9 @@ void dooble::slot_tab_index_changed(int index)
     setWindowTitle(tr("Dooble"));
   else
     setWindowTitle
-      (tr("%1 - Dooble").arg(page->title().trimmed().
-			     mid(0, dooble::Limits::MAXIMUM_TITLE_LENGTH)));
+      (tr("%1 - Dooble").
+       arg(page->title().trimmed().
+	   mid(0, static_cast<int> (dooble::Limits::MAXIMUM_TITLE_LENGTH))));
 
   page->hide_status_bar
     (!dooble_settings::setting("status_bar_visible").toBool());
@@ -4477,10 +4541,12 @@ void dooble::slot_title_changed(const QString &title)
   if(!page)
     return;
 
-  auto text(title.trimmed().mid(0, dooble::Limits::MAXIMUM_TITLE_LENGTH));
+  auto text(title.trimmed().
+	    mid(0, static_cast<int> (dooble::Limits::MAXIMUM_TITLE_LENGTH)));
 
   if(text.isEmpty())
-    text = page->url().toString().mid(0, dooble::Limits::MAXIMUM_URL_LENGTH);
+    text = page->url().toString().mid
+      (0, static_cast<int> (dooble::Limits::MAXIMUM_URL_LENGTH));
 
   if(text.isEmpty())
     text = tr("Dooble");
@@ -4549,7 +4615,7 @@ void dooble::slot_vacuum_databases(void)
   dialog.setWindowTitle(tr("Dooble: Vacuuming Databases"));
   dialog.show();
 
-  for(const auto &i : list)
+  foreach(const auto &i, list)
     {
       if(dialog.wasCanceled())
 	break;
@@ -4592,8 +4658,8 @@ void dooble::slot_warn_of_missing_sqlite_driver(void)
   auto found = false;
   auto list(QSqlDatabase::drivers());
 
-  for(const auto &i : list)
-    if(i.toLower().contains("sqlite"))
+  foreach(const auto &i, list)
+    if(i.contains("sqlite", Qt::CaseInsensitive))
       {
 	found = true;
 	break;

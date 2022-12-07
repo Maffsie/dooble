@@ -292,7 +292,7 @@ void dooble_tab_widget::prepare_tab_label(int index, const QIcon &icon)
   if(!label)
     {
       label = new QLabel(this);
-      label->setAlignment(Qt::AlignHCenter | Qt::AlignVCenter);
+      label->setAlignment(Qt::AlignCenter);
       label->setPixmap(icon.pixmap(icon.actualSize(QSize(16, 16))));
       m_tab_bar->setTabButton(index, side, nullptr);
       m_tab_bar->setTabButton(index, side, label);
@@ -313,7 +313,7 @@ void dooble_tab_widget::prepare_tab_label(int index, const QIcon &icon)
   if(!label)
     {
       label = new QLabel(this);
-      label->setAlignment(Qt::AlignHCenter | Qt::AlignVCenter);
+      label->setAlignment(Qt::AlignCenter);
       label->setFixedSize(QSize(16, 16));
       label->setPixmap(icon.pixmap(icon.actualSize(QSize(16, 16))));
       m_tab_bar->setTabButton(index, side, nullptr);
@@ -343,6 +343,15 @@ void dooble_tab_widget::setTabToolTip(int index, const QString &text)
 
 void dooble_tab_widget::set_tab_position(void)
 {
+  auto show_left_corner_widget = dooble_settings::setting
+    ("show_left_corner_widget").toBool();
+
+  if(!show_left_corner_widget)
+    {
+      m_left_corner_widget->setVisible(false);
+      setCornerWidget(nullptr, Qt::TopLeftCorner);
+    }
+
   auto tab_position
     (dooble_settings::setting("tab_position").toString().trimmed());
 
@@ -354,7 +363,7 @@ void dooble_tab_widget::set_tab_position(void)
     }
   else if(tab_position == "south")
     {
-      if(!cornerWidget(Qt::TopLeftCorner))
+      if(!cornerWidget(Qt::TopLeftCorner) && show_left_corner_widget)
 	setCornerWidget(m_left_corner_widget, Qt::TopLeftCorner);
 
       setTabPosition(QTabWidget::South);
@@ -367,7 +376,7 @@ void dooble_tab_widget::set_tab_position(void)
     }
   else
     {
-      if(!cornerWidget(Qt::TopLeftCorner))
+      if(!cornerWidget(Qt::TopLeftCorner) && show_left_corner_widget)
 	setCornerWidget(m_left_corner_widget, Qt::TopLeftCorner);
 
       setTabPosition(QTabWidget::North);
@@ -386,9 +395,10 @@ void dooble_tab_widget::slot_about_to_show_history_menu(void)
 
   QFontMetrics font_metrics(m_add_tab_tool_button->menu()->font());
   auto list(dooble::s_history->
-	    last_n_actions(5 + dooble_page::MAXIMUM_HISTORY_ITEMS));
+	    last_n_actions(5 + static_cast<int> (dooble_page::
+						 MAXIMUM_HISTORY_ITEMS)));
 
-  for(auto i : list)
+  foreach(auto i, list)
     {
       connect(i,
 	      SIGNAL(triggered(void)),
@@ -488,7 +498,7 @@ void dooble_tab_widget::slot_load_started(void)
   if(!label)
     {
       label = new QLabel(this);
-      label->setAlignment(Qt::AlignHCenter | Qt::AlignVCenter);
+      label->setAlignment(Qt::AlignCenter);
       m_tab_bar->setTabButton(index, side, nullptr);
       m_tab_bar->setTabButton(index, side, label);
     }
@@ -512,6 +522,13 @@ void dooble_tab_widget::slot_load_started(void)
 
 void dooble_tab_widget::slot_set_visible_corner_button(bool state)
 {
+  if(!dooble_settings::setting("show_left_corner_widget").toBool())
+    {
+      m_left_corner_widget->setVisible(false);
+      setCornerWidget(nullptr, Qt::TopLeftCorner);
+      return;
+    }
+
   auto tab_position
     (dooble_settings::setting("tab_position").toString().trimmed());
 

@@ -44,8 +44,10 @@ class dooble_address_widget_completer: public QCompleter
   ~dooble_address_widget_completer();
   static void add_item(const QIcon &icon, const QUrl &url);
   static void remove_item(const QUrl &url);
-  void complete(void);
   void set_item_icon(const QIcon &icon, const QUrl &url);
+
+ public slots:
+  void complete(const QRect &rect = QRect());
 
  private:
   QStandardItemModel *m_model;
@@ -59,6 +61,7 @@ class dooble_address_widget_completer: public QCompleter
  private slots:
   void slot_clicked(const QModelIndex &index);
   void slot_history_cleared(void);
+  void slot_settings_applied(void);
   void slot_text_edited_timeout(void);
 };
 

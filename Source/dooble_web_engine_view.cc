@@ -45,6 +45,7 @@
 dooble_web_engine_view::dooble_web_engine_view
 (QWebEngineProfile *web_engine_profile, QWidget *parent):QWebEngineView(parent)
 {
+  dooble::s_gopher->set_web_engine_view(this);
   m_dialog_requests_timer.setInterval(100);
   m_dialog_requests_timer.setSingleShot(true);
   m_is_private = QWebEngineProfile::defaultProfile() != web_engine_profile &&
@@ -89,6 +90,10 @@ dooble_web_engine_view::dooble_web_engine_view
 	  SIGNAL(loadProgress(int)),
 	  this,
 	  SLOT(slot_load_progress(int)));
+  connect(this,
+	  SIGNAL(loadStarted(void)),
+	  this,
+	  SLOT(slot_load_started(void)));
 
   if(QWebEngineProfile::defaultProfile() != m_page->profile())
 #if (QT_VERSION < QT_VERSION_CHECK(6, 0, 0))
@@ -108,8 +113,7 @@ dooble_web_engine_view::dooble_web_engine_view
       ("gemini", new dooble_gemini(this));
 
   if(!m_page->profile()->urlSchemeHandler("gopher"))
-    m_page->profile()->installUrlSchemeHandler
-      ("gopher", new dooble_gopher(this));
+    m_page->profile()->installUrlSchemeHandler("gopher", dooble::s_gopher);
 
   setPage(m_page);
 }
@@ -271,7 +275,7 @@ void dooble_web_engine_view::contextMenuEvent(QContextMenuEvent *event)
   list << QWebEnginePage::OpenLinkInNewTab
        << QWebEnginePage::OpenLinkInNewWindow;
 
-  for(const auto i : list)
+  foreach(const auto i, list)
     if((action = m_page->action(i)))
       action->setVisible(false);
 
@@ -280,7 +284,7 @@ void dooble_web_engine_view::contextMenuEvent(QContextMenuEvent *event)
   if(action)
     action->setText(tr("View Page Source"));
 
-  if(!menu->actions().isEmpty() && !menu->actions().last()->isSeparator())
+  if(!menu->actions().isEmpty() && !menu->actions().constLast()->isSeparator())
     menu->addSeparator();
 
   action = menu->addAction
@@ -462,16 +466,17 @@ void dooble_web_engine_view::contextMenuEvent(QContextMenuEvent *event)
 	{
 	  sub_menu->setStyleSheet("QMenu {menu-scrollable: 1;}");
 
-	  for(auto i : actions)
-	    {
-	      auto action = sub_menu->addAction(i->icon(),
-						i->text(),
-						this,
-						SLOT(slot_search(void)));
+	  foreach(auto i, actions)
+	    if(i)
+	      {
+		auto action = sub_menu->addAction(i->icon(),
+						  i->text(),
+						  this,
+						  SLOT(slot_search(void)));
 
-	      action->setProperty("selected_text", selectedText());
-	      action->setProperty("url", i->property("url"));
-	    }
+		action->setProperty("selected_text", selectedText());
+		action->setProperty("url", i->property("url"));
+	      }
 	}
       else
 	sub_menu->setEnabled(false);
@@ -549,7 +554,7 @@ void dooble_web_engine_view::slot_certificate_exception_accepted
 
 void dooble_web_engine_view::slot_create_dialog_requests(void)
 {
-  for(auto dialog_request : m_dialog_requests)
+  foreach(auto dialog_request, m_dialog_requests)
     emit create_dialog_request(dialog_request);
 
   m_dialog_requests.clear();
@@ -559,6 +564,11 @@ void dooble_web_engine_view::slot_load_progress(int progress)
 {
   if(progress == 100)
     emit loadFinished(true);
+}
+
+void dooble_web_engine_view::slot_load_started(void)
+{
+  dooble::s_gopher->set_web_engine_view(this);
 }
 
 void dooble_web_engine_view::slot_open_link_in_current_page(void)

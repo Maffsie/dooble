@@ -25,6 +25,7 @@
 ** DOOBLE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
+#include <QActionGroup>
 #include <QWebEngineSettings>
 #include <QtMath>
 
@@ -101,7 +102,7 @@ dooble_tab_bar::dooble_tab_bar(QWidget *parent):QTabBar(parent)
   setElideMode(Qt::ElideRight);
   setExpanding(true);
   setMovable(true);
-  setSelectionBehaviorOnRemove(QTabBar::SelectPreviousTab);
+  setSelectionBehaviorOnRemove(QTabBar::SelectRightTab);
 #ifdef Q_OS_MACOS
   setStyleSheet("QTabBar::close-button {"
 		"height: 16px;"

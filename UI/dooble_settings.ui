@@ -20,6 +20,19 @@
   <widget class="QWidget" name="centralwidget">
    <layout class="QVBoxLayout" name="verticalLayout_3">
     <item>
+     <widget class="QLabel" name="settings_path">
+      <property name="text">
+       <string>Location</string>
+      </property>
+      <property name="wordWrap">
+       <bool>true</bool>
+      </property>
+      <property name="textInteractionFlags">
+       <set>Qt::LinksAccessibleByMouse|Qt::TextSelectableByKeyboard|Qt::TextSelectableByMouse</set>
+      </property>
+     </widget>
+    </item>
+    <item>
      <layout class="QHBoxLayout" name="horizontalLayout">
       <item>
        <widget class="QScrollArea" name="scrollArea">
@@ -47,7 +60,7 @@
            <x>0</x>
            <y>0</y>
            <width>105</width>
-           <height>546</height>
+           <height>522</height>
           </rect>
          </property>
          <layout class="QVBoxLayout" name="verticalLayout">
@@ -358,8 +371,8 @@
               <rect>
                <x>0</x>
                <y>0</y>
-               <width>357</width>
-               <height>618</height>
+               <width>642</width>
+               <height>780</height>
               </rect>
              </property>
              <layout class="QVBoxLayout" name="verticalLayout_19">
@@ -372,6 +385,40 @@
                  <bool>true</bool>
                 </property>
                </widget>
+              </item>
+              <item>
+               <layout class="QHBoxLayout" name="horizontalLayout_21">
+                <item>
+                 <widget class="QLabel" name="label_47">
+                  <property name="text">
+                   <string>Application Font</string>
+                  </property>
+                  <property name="buddy">
+                   <cstring>home_url</cstring>
+                  </property>
+                 </widget>
+                </item>
+                <item>
+                 <widget class="QPushButton" name="display_application_font">
+                  <property name="text">
+                   <string/>
+                  </property>
+                 </widget>
+                </item>
+                <item>
+                 <spacer name="horizontalSpacer_22">
+                  <property name="orientation">
+                   <enum>Qt::Horizontal</enum>
+                  </property>
+                  <property name="sizeHint" stdset="0">
+                   <size>
+                    <width>40</width>
+                    <height>20</height>
+                   </size>
+                  </property>
+                 </spacer>
+                </item>
+               </layout>
               </item>
               <item>
                <widget class="QCheckBox" name="denote_private_widgets">
@@ -539,17 +586,54 @@
                </layout>
               </item>
               <item>
-               <widget class="QCheckBox" name="main_menu_bar_visible">
-                <property name="toolTip">
-                 <string>If hidden, show via F10.</string>
-                </property>
-                <property name="text">
-                 <string>Main Menu Bar Visible</string>
-                </property>
-                <property name="checked">
-                 <bool>true</bool>
-                </property>
-               </widget>
+               <layout class="QHBoxLayout" name="horizontalLayout_22">
+                <item>
+                 <widget class="QCheckBox" name="main_menu_bar_visible">
+                  <property name="toolTip">
+                   <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;If hidden, show via the configured shortcut.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+                  </property>
+                  <property name="text">
+                   <string>Main Menu Bar Visible</string>
+                  </property>
+                  <property name="checked">
+                   <bool>true</bool>
+                  </property>
+                 </widget>
+                </item>
+                <item>
+                 <widget class="QComboBox" name="main_menu_bar_visible_shortcut">
+                  <property name="currentIndex">
+                   <number>0</number>
+                  </property>
+                  <property name="sizeAdjustPolicy">
+                   <enum>QComboBox::AdjustToContents</enum>
+                  </property>
+                  <item>
+                   <property name="text">
+                    <string>Alt</string>
+                   </property>
+                  </item>
+                  <item>
+                   <property name="text">
+                    <string>F10</string>
+                   </property>
+                  </item>
+                 </widget>
+                </item>
+                <item>
+                 <spacer name="horizontalSpacer_23">
+                  <property name="orientation">
+                   <enum>Qt::Horizontal</enum>
+                  </property>
+                  <property name="sizeHint" stdset="0">
+                   <size>
+                    <width>40</width>
+                    <height>20</height>
+                   </size>
+                  </property>
+                 </spacer>
+                </item>
+               </layout>
               </item>
               <item>
                <widget class="QGroupBox" name="groupBox">
@@ -604,6 +688,39 @@
                </widget>
               </item>
               <item>
+               <widget class="QCheckBox" name="show_address_widget_completer">
+                <property name="text">
+                 <string>Show Address Widget Completer</string>
+                </property>
+                <property name="checked">
+                 <bool>true</bool>
+                </property>
+               </widget>
+              </item>
+              <item>
+               <widget class="QCheckBox" name="show_left_corner_widget">
+                <property name="text">
+                 <string>Show Left-Corner Widget</string>
+                </property>
+                <property name="checked">
+                 <bool>true</bool>
+                </property>
+               </widget>
+              </item>
+              <item>
+               <widget class="QCheckBox" name="show_loading_gradient">
+                <property name="toolTip">
+                 <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;If the Status Bar is hidden, show a loading gradient in the address bar.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+                </property>
+                <property name="text">
+                 <string>Show Loading Gradient</string>
+                </property>
+                <property name="checked">
+                 <bool>true</bool>
+                </property>
+               </widget>
+              </item>
+              <item>
                <widget class="QCheckBox" name="show_new_downloads">
                 <property name="text">
                  <string>Show New Downloads</string>
@@ -627,6 +744,19 @@
                 </property>
                 <property name="text">
                  <string>Show New Tabs</string>
+                </property>
+                <property name="checked">
+                 <bool>true</bool>
+                </property>
+               </widget>
+              </item>
+              <item>
+               <widget class="QCheckBox" name="splash_screen">
+                <property name="toolTip">
+                 <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Display a fancy splash screen during launch.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+                </property>
+                <property name="text">
+                 <string>Splash Screen</string>
                 </property>
                 <property name="checked">
                  <bool>true</bool>
@@ -914,10 +1044,20 @@
                <x>0</x>
                <y>0</y>
                <width>617</width>
-               <height>820</height>
+               <height>866</height>
               </rect>
              </property>
              <layout class="QVBoxLayout" name="verticalLayout_8">
+              <item>
+               <widget class="QCheckBox" name="block_third_party_cookies">
+                <property name="text">
+                 <string>Block Third-Party Cookies</string>
+                </property>
+                <property name="checked">
+                 <bool>true</bool>
+                </property>
+               </widget>
+              </item>
               <item>
                <layout class="QHBoxLayout" name="horizontalLayout_7">
                 <item>
@@ -1483,9 +1623,9 @@
              <property name="geometry">
               <rect>
                <x>0</x>
-               <y>-1068</y>
-               <width>642</width>
-               <height>1730</height>
+               <y>0</y>
+               <width>486</width>
+               <height>2074</height>
               </rect>
              </property>
              <layout class="QVBoxLayout" name="verticalLayout_16">
@@ -1535,6 +1675,13 @@
                  <bool>true</bool>
                 </property>
                 <layout class="QVBoxLayout" name="verticalLayout_18">
+                 <item>
+                  <widget class="QLabel" name="label_44">
+                   <property name="text">
+                    <string>Settings are saved immediately.</string>
+                   </property>
+                  </widget>
+                 </item>
                  <item>
                   <widget class="QTableWidget" name="features_permissions">
                    <property name="minimumSize">
@@ -1726,17 +1873,13 @@
                  </item>
                  <item>
                   <layout class="QGridLayout" name="gridLayout_5">
-                   <item row="2" column="0">
-                    <widget class="QLabel" name="label_36">
-                     <property name="text">
-                      <string>Minimum</string>
+                   <item row="1" column="1">
+                    <widget class="QSpinBox" name="web_font_size_default_fixed">
+                     <property name="minimum">
+                      <number>1</number>
                      </property>
-                    </widget>
-                   </item>
-                   <item row="1" column="0">
-                    <widget class="QLabel" name="label_35">
-                     <property name="text">
-                      <string>Default Fixed</string>
+                     <property name="value">
+                      <number>10</number>
                      </property>
                     </widget>
                    </item>
@@ -1750,23 +1893,60 @@
                      </property>
                     </widget>
                    </item>
-                   <item row="2" column="2">
-                    <widget class="QLabel" name="label_41">
+                   <item row="3" column="2">
+                    <widget class="QLabel" name="label_42">
                      <property name="text">
-                      <string>The hard minimum font size.</string>
+                      <string>The minimum logical font size that is applied when zooming out.</string>
                      </property>
                      <property name="wordWrap">
                       <bool>true</bool>
                      </property>
                     </widget>
                    </item>
-                   <item row="1" column="1">
-                    <widget class="QSpinBox" name="web_font_size_default_fixed">
+                   <item row="2" column="0">
+                    <widget class="QLabel" name="label_36">
+                     <property name="text">
+                      <string>Minimum</string>
+                     </property>
+                    </widget>
+                   </item>
+                   <item row="3" column="0">
+                    <widget class="QLabel" name="label_37">
+                     <property name="text">
+                      <string>Minimum Logical</string>
+                     </property>
+                    </widget>
+                   </item>
+                   <item row="3" column="1">
+                    <widget class="QSpinBox" name="web_font_size_minimum_logical">
                      <property name="minimum">
                       <number>1</number>
                      </property>
                      <property name="value">
                       <number>10</number>
+                     </property>
+                    </widget>
+                   </item>
+                   <item row="0" column="1">
+                    <widget class="QSpinBox" name="web_font_size_default">
+                     <property name="minimumSize">
+                      <size>
+                       <width>100</width>
+                       <height>0</height>
+                      </size>
+                     </property>
+                     <property name="minimum">
+                      <number>1</number>
+                     </property>
+                     <property name="value">
+                      <number>10</number>
+                     </property>
+                    </widget>
+                   </item>
+                   <item row="1" column="0">
+                    <widget class="QLabel" name="label_35">
+                     <property name="text">
+                      <string>Default Fixed</string>
                      </property>
                     </widget>
                    </item>
@@ -1780,20 +1960,26 @@
                      </property>
                     </widget>
                    </item>
-                   <item row="0" column="2">
-                    <widget class="QLabel" name="label_40">
+                   <item row="2" column="2">
+                    <widget class="QLabel" name="label_41">
                      <property name="text">
-                      <string>The default font size for regular text.</string>
+                      <string>The hard minimum font size.</string>
                      </property>
                      <property name="wordWrap">
                       <bool>true</bool>
                      </property>
                     </widget>
                    </item>
-                   <item row="3" column="2">
-                    <widget class="QLabel" name="label_42">
+                   <item row="0" column="2">
+                    <widget class="QLabel" name="label_40">
+                     <property name="sizePolicy">
+                      <sizepolicy hsizetype="Expanding" vsizetype="Preferred">
+                       <horstretch>0</horstretch>
+                       <verstretch>0</verstretch>
+                      </sizepolicy>
+                     </property>
                      <property name="text">
-                      <string>The minimum logical font size that is applied when zooming out.</string>
+                      <string>The default font size for regular text.</string>
                      </property>
                      <property name="wordWrap">
                       <bool>true</bool>
@@ -1804,33 +1990,6 @@
                     <widget class="QLabel" name="label_34">
                      <property name="text">
                       <string>Default</string>
-                     </property>
-                    </widget>
-                   </item>
-                   <item row="3" column="0">
-                    <widget class="QLabel" name="label_37">
-                     <property name="text">
-                      <string>Minimum Logical</string>
-                     </property>
-                    </widget>
-                   </item>
-                   <item row="0" column="1">
-                    <widget class="QSpinBox" name="web_font_size_default">
-                     <property name="minimum">
-                      <number>1</number>
-                     </property>
-                     <property name="value">
-                      <number>10</number>
-                     </property>
-                    </widget>
-                   </item>
-                   <item row="3" column="1">
-                    <widget class="QSpinBox" name="web_font_size_minimum_logical">
-                     <property name="minimum">
-                      <number>1</number>
-                     </property>
-                     <property name="value">
-                      <number>10</number>
                      </property>
                     </widget>
                    </item>
@@ -1877,6 +2036,13 @@
                     <bool>true</bool>
                    </property>
                    <layout class="QVBoxLayout" name="verticalLayout_15">
+                    <item>
+                     <widget class="QLabel" name="label_45">
+                      <property name="text">
+                       <string>Settings are saved immediately.</string>
+                      </property>
+                     </widget>
+                    </item>
                     <item>
                      <layout class="QHBoxLayout" name="horizontalLayout_14">
                       <item>
@@ -2053,6 +2219,16 @@
                </widget>
               </item>
               <item>
+               <widget class="QCheckBox" name="temporarily_disable_javascript">
+                <property name="toolTip">
+                 <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Disable JavaScript after a page has completed loading (the page-loaded signal has been monitored) and re-enable it shortly after.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+                </property>
+                <property name="text">
+                 <string>Temporarily Disable JavaScript</string>
+                </property>
+               </widget>
+              </item>
+              <item>
                <layout class="QHBoxLayout" name="horizontalLayout_20">
                 <item>
                  <widget class="QLabel" name="label_43">
@@ -2134,6 +2310,65 @@
                 <property name="text">
                  <string>Web Plugins</string>
                 </property>
+               </widget>
+              </item>
+              <item>
+               <widget class="QGroupBox" name="groupBox_4">
+                <property name="title">
+                 <string>WebEngine</string>
+                </property>
+                <layout class="QVBoxLayout" name="verticalLayout_21">
+                 <item>
+                  <widget class="QLabel" name="label_46">
+                   <property name="text">
+                    <string>Settings are saved immediately. Please restart Dooble if changes are made.</string>
+                   </property>
+                  </widget>
+                 </item>
+                 <item>
+                  <widget class="QTableWidget" name="web_engine_settings">
+                   <property name="tabKeyNavigation">
+                    <bool>false</bool>
+                   </property>
+                   <property name="alternatingRowColors">
+                    <bool>true</bool>
+                   </property>
+                   <property name="selectionMode">
+                    <enum>QAbstractItemView::SingleSelection</enum>
+                   </property>
+                   <property name="verticalScrollMode">
+                    <enum>QAbstractItemView::ScrollPerPixel</enum>
+                   </property>
+                   <property name="horizontalScrollMode">
+                    <enum>QAbstractItemView::ScrollPerPixel</enum>
+                   </property>
+                   <attribute name="horizontalHeaderDefaultSectionSize">
+                    <number>130</number>
+                   </attribute>
+                   <attribute name="horizontalHeaderStretchLastSection">
+                    <bool>true</bool>
+                   </attribute>
+                   <attribute name="verticalHeaderVisible">
+                    <bool>false</bool>
+                   </attribute>
+                   <column>
+                    <property name="text">
+                     <string>Setting</string>
+                    </property>
+                   </column>
+                   <column>
+                    <property name="text">
+                     <string>Translate Value</string>
+                    </property>
+                   </column>
+                   <column>
+                    <property name="text">
+                     <string>Value</string>
+                    </property>
+                   </column>
+                  </widget>
+                 </item>
+                </layout>
                </widget>
               </item>
               <item>
@@ -2270,24 +2505,31 @@
   <tabstop>cache_type</tabstop>
   <tabstop>scrollArea_4</tabstop>
   <tabstop>allow_closing_of_single_tab</tabstop>
+  <tabstop>display_application_font</tabstop>
   <tabstop>denote_private_widgets</tabstop>
   <tabstop>home_url</tabstop>
   <tabstop>icon_set</tabstop>
   <tabstop>language</tabstop>
   <tabstop>main_menu_bar_visible</tabstop>
+  <tabstop>main_menu_bar_visible_shortcut</tabstop>
   <tabstop>pin_accepted_or_blocked_domains</tabstop>
   <tabstop>pin_downloads</tabstop>
   <tabstop>pin_history</tabstop>
   <tabstop>pin_settings</tabstop>
+  <tabstop>show_address_widget_completer</tabstop>
+  <tabstop>show_left_corner_widget</tabstop>
+  <tabstop>show_loading_gradient</tabstop>
   <tabstop>show_new_downloads</tabstop>
   <tabstop>show_hovered_links_tool_tips</tabstop>
   <tabstop>access_new_tabs</tabstop>
+  <tabstop>splash_screen</tabstop>
   <tabstop>tab_position</tabstop>
   <tabstop>theme</tabstop>
   <tabstop>zoom_frame_location</tabstop>
   <tabstop>browsing_history</tabstop>
   <tabstop>visited_links</tabstop>
   <tabstop>scrollArea_2</tabstop>
+  <tabstop>block_third_party_cookies</tabstop>
   <tabstop>cookie_policy</tabstop>
   <tabstop>credentials</tabstop>
   <tabstop>cipher</tabstop>
@@ -2336,15 +2578,17 @@
   <tabstop>remove_selected_javascript_block_popup_exceptions</tabstop>
   <tabstop>local_storage</tabstop>
   <tabstop>dictionaries</tabstop>
+  <tabstop>temporarily_disable_javascript</tabstop>
   <tabstop>zoom</tabstop>
   <tabstop>user_agent</tabstop>
   <tabstop>reset_user_agent</tabstop>
-  <tabstop>web_plugins</tabstop>
+  <tabstop>web_engine_settings</tabstop>
   <tabstop>webgl</tabstop>
   <tabstop>webrtc_public_interfaces_only</tabstop>
   <tabstop>xss_auditing</tabstop>
   <tabstop>center_child_windows</tabstop>
   <tabstop>save_geometry</tabstop>
+  <tabstop>web_plugins</tabstop>
  </tabstops>
  <resources>
   <include location="../Icons/icons.qrc"/>

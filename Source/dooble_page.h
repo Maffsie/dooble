@@ -152,6 +152,7 @@ class dooble_page: public QWidget
   void slot_dooble_credentials_created(void);
   void slot_downloads_finished(void);
   void slot_downloads_started(void);
+  void slot_enable_javascript(void);
   void slot_escape(void);
   void slot_export_as_png_timer_timeout(void);
   void slot_favorite_changed(const QUrl &url, bool state);
@@ -177,6 +178,10 @@ class dooble_page: public QWidget
   void slot_load_page(void);
   void slot_load_progress(int progress);
   void slot_load_started(void);
+  void slot_loading(const QUrl &url);
+#if (QT_VERSION >= QT_VERSION_CHECK(6, 2, 0))
+  void slot_loading_changed(const QWebEngineLoadingInfo &info);
+#endif
   void slot_only_now_allow_javascript_popup(void);
   void slot_open_link(const QUrl &url);
   void slot_open_link(void);
@@ -204,6 +209,7 @@ class dooble_page: public QWidget
   void slot_zoom_in(void);
   void slot_zoom_out(void);
   void slot_zoom_reset(void);
+  void slot_zoomed(void);
 
  signals:
   void authenticate(void);

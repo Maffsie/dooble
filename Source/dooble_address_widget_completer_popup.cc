@@ -33,7 +33,8 @@ dooble_address_widget_completer_popup::dooble_address_widget_completer_popup
   setAlternatingRowColors(false);
   setIconSize(QSize(16, 16));
   setMouseTracking(true);
-  setStyleSheet("QTableView {gridline-color: #e8e8e8;}");
+  setShowGrid(false);
+  setVerticalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
   setVerticalScrollMode(QAbstractItemView::ScrollPerPixel);
   setWordWrap(false);
 }

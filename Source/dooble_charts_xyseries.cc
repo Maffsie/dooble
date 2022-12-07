@@ -29,6 +29,7 @@
 #include <QSqlDatabase>
 #include <QSqlQuery>
 
+#include "dooble_application.h"
 #include "dooble_charts_property_editor_xyseries.h"
 #include "dooble_charts_xyseries.h"
 #include "dooble_database_utilities.h"
@@ -580,8 +581,11 @@ void dooble_charts_xyseries::slot_item_changed(QStandardItem *item)
       {
 	QFont font;
 
-	if(font.fromString(item->text()))
+	if(!item->text().trimmed().isEmpty() &&
+	   font.fromString(item->text().trimmed()))
 	  series->setPointLabelsFont(font);
+	else
+	  series->setPointLabelsFont(dooble_application::font());
 
 	break;
       }

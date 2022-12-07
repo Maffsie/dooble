@@ -67,6 +67,7 @@ extern "C"
 #include "dooble_random.h"
 #include "dooble_search_engines_popup.h"
 #include "dooble_style_sheet.h"
+#include "dooble_threefish256.h"
 #include "dooble_ui_utilities.h"
 
 #include <csignal>
@@ -94,6 +95,9 @@ int main(int argc, char *argv[])
 
   QList<QUrl> urls;
   auto test_aes = false;
+  auto test_aes_performance = false;
+  auto test_threefish = false;
+  auto test_threefish_performance = false;
 
   for(int i = 1; i < argc; i++)
     if(argv && argv[i])
@@ -112,14 +116,41 @@ int main(int argc, char *argv[])
 	  }
 	else if(strcmp(argv[i], "--test-aes") == 0)
 	  test_aes = true;
+	else if(strcmp(argv[i], "--test-aes-performance") == 0)
+	  test_aes_performance = true;
+	else if(strcmp(argv[i], "--test-threefish") == 0)
+	  test_threefish = true;
+	else if(strcmp(argv[i], "--test-threefish-performance") == 0)
+	  test_threefish_performance = true;
+	else
+	  {
+	    QUrl url(QUrl::fromUserInput(argv[i]));
+
+	    if(dooble_ui_utilities::allowed_scheme(url))
+	      urls << url;
+	  }
       }
 
   if(test_aes)
     {
+      dooble_aes256::test1();
       dooble_aes256::test1_encrypt_block();
       dooble_aes256::test1_decrypt_block();
       dooble_aes256::test1_key_expansion();
     }
+
+  if(test_aes_performance)
+    dooble_aes256::test_performance();
+
+  if(test_threefish)
+    {
+      dooble_threefish256::test1();
+      dooble_threefish256::test2();
+      dooble_threefish256::test3();
+    }
+
+  if(test_threefish_performance)
+    dooble_threefish256::test_performance();
 
 #ifdef Q_OS_MACOS
   struct rlimit rlim = {0, 0};
@@ -147,7 +178,7 @@ int main(int argc, char *argv[])
        << SIGSEGV
        << SIGTERM;
 
-  for(const auto i : list)
+  foreach(const auto i, list)
     {
 #if defined(Q_OS_LINUX) || defined(Q_OS_MACOS) || defined(Q_OS_UNIX)
       memset(&signal_action, 0, sizeof(struct sigaction));
@@ -219,13 +250,11 @@ int main(int argc, char *argv[])
   QWebEngineUrlScheme::registerScheme(gophScheme);
 #endif
 #endif
-
-  dooble::s_application = new dooble_application(argc, argv);
-
 #ifdef Q_OS_MACOS
   QDir::setCurrent("/Applications/Dooble.d");
 #endif
   QString dooble_directory(".dooble");
+  QString dooble_settings_path("");
 #if defined(Q_OS_WIN)
   QFileInfo file_info;
   QString username(qgetenv("USERNAME").mid(0, 32).trimmed().constData());
@@ -239,15 +268,17 @@ int main(int argc, char *argv[])
   if(username.isEmpty())
     home_dir.mkdir(dooble_directory);
   else
-    home_dir.mkdir(username + QDir::separator() + dooble_directory);
+    home_dir.mkpath(username + QDir::separator() + dooble_directory);
 
   if(username.isEmpty())
     dooble_settings::set_setting
       ("home_path",
+       dooble_settings_path =
        home_dir.absolutePath() + QDir::separator() + dooble_directory);
   else
     dooble_settings::set_setting
       ("home_path",
+       dooble_settings_path =
        home_dir.absolutePath() +
        QDir::separator() +
        username +
@@ -263,6 +294,7 @@ int main(int argc, char *argv[])
       home_dir.mkdir(dooble_directory);
       dooble_settings::set_setting
 	("home_path",
+	 dooble_settings_path =
 	 home_dir.absolutePath() + QDir::separator() + dooble_directory);
     }
   else
@@ -272,9 +304,18 @@ int main(int argc, char *argv[])
       home_dir.mkdir("dooble");
       dooble_settings::set_setting
 	("home_path",
+	 dooble_settings_path =
 	 home_dir.absolutePath() + QDir::separator() + "dooble");
     }
 #endif
+
+  dooble_settings::prepare_web_engine_environment_variables();
+
+  /*
+  ** Create the application after environment variables are prepared.
+  */
+
+  dooble::s_application = new dooble_application(argc, argv);
 
   /*
   ** Create a splash screen.
@@ -282,16 +323,20 @@ int main(int argc, char *argv[])
 
   QElapsedTimer t;
   QSplashScreen splash(QPixmap(":/Miscellaneous/splash.png"));
+  auto splash_screen = dooble_settings::setting("splash_screen", true).toBool();
 
-  splash.setEnabled(false);
-  splash.show();
-  splash.showMessage
-    (QObject::tr("Initializing Dooble's random number generator."),
-     Qt::AlignHCenter | Qt::AlignBottom);
-  t.start();
+  if(splash_screen)
+    {
+      splash.setEnabled(false);
+      splash.show();
+      splash.showMessage
+	(QObject::tr("Initializing Dooble's random number generator."),
+	 Qt::AlignHCenter | Qt::AlignBottom);
+      t.start();
 
-  while(t.elapsed() < 500)
-    splash.repaint();
+      while(t.elapsed() < 500)
+	splash.repaint();
+    }
 
   dooble_random::initialize();
   dooble::s_application->processEvents();
@@ -304,17 +349,28 @@ int main(int argc, char *argv[])
   CocoaInitializer cocoa_initializer;
 #endif
   dooble::s_application->install_translator();
-  splash.showMessage
-    (QObject::tr("Purging temporary database entries."),
-     Qt::AlignHCenter | Qt::AlignBottom);
-  splash.repaint();
-  dooble::s_application->processEvents();
+
+  if(splash_screen)
+    {
+      splash.showMessage
+	(QObject::tr("Purging temporary database entries."),
+	 Qt::AlignHCenter | Qt::AlignBottom);
+      splash.repaint();
+      dooble::s_application->processEvents();
+    }
+
   dooble_certificate_exceptions_menu_widget::purge_temporary();
   dooble_favicons::purge_temporary();
-  splash.showMessage
-    (QObject::tr("Preparing QWebEngine."), Qt::AlignHCenter | Qt::AlignBottom);
-  splash.repaint();
-  dooble::s_application->processEvents();
+
+  if(splash_screen)
+    {
+      splash.showMessage
+	(QObject::tr("Preparing QWebEngine."),
+	 Qt::AlignHCenter | Qt::AlignBottom);
+      splash.repaint();
+      dooble::s_application->processEvents();
+    }
+
   QWebEngineProfile::defaultProfile()->setCachePath
     (dooble_settings::setting("home_path").toString() +
      QDir::separator() +
@@ -368,11 +424,17 @@ int main(int argc, char *argv[])
     (QWebEngineSettings::WebRTCPublicInterfacesOnly, true);
 #endif
 #endif
-  splash.showMessage(QObject::tr("Preparing Dooble objects."),
-		     Qt::AlignHCenter | Qt::AlignBottom);
-  splash.repaint();
-  dooble::s_application->processEvents();
+
+  if(splash_screen)
+    {
+      splash.showMessage(QObject::tr("Preparing Dooble objects."),
+			 Qt::AlignHCenter | Qt::AlignBottom);
+      splash.repaint();
+      dooble::s_application->processEvents();
+    }
+
   dooble::s_settings = new dooble_settings();
+  dooble::s_settings->set_settings_path(dooble_settings_path);
 
   auto arguments(QCoreApplication::arguments());
   auto d = new dooble
@@ -425,10 +487,10 @@ int main(int argc, char *argv[])
 		   SLOT(slot_populated(void)));
   QObject::connect(dooble::s_cookies,
 		   SIGNAL(cookies_added(const QList<QNetworkCookie> &,
-					const QList<bool> &)),
+					const QList<int> &)),
 		   dooble::s_cookies_window,
 		   SLOT(slot_cookies_added(const QList<QNetworkCookie> &,
-					   const QList<bool> &)));
+					   const QList<int> &)));
   QObject::connect(dooble::s_cookies,
 		   SIGNAL(cookie_removed(const QNetworkCookie &)),
 		   dooble::s_cookies_window,
@@ -455,19 +517,24 @@ int main(int argc, char *argv[])
 		   SIGNAL(populated(void)),
 		   d,
 		   SLOT(slot_populated(void)));
-  splash.showMessage(QObject::tr("Populating Dooble containers."),
-		     Qt::AlignHCenter | Qt::AlignBottom);
-  splash.repaint();
-  dooble::s_application->processEvents();
 
-  while(!d->initialized())
-    splash.repaint();
+  if(splash_screen)
+    {
+      splash.showMessage(QObject::tr("Populating Dooble containers."),
+			 Qt::AlignHCenter | Qt::AlignBottom);
+      splash.repaint();
+      dooble::s_application->processEvents();
 
-  splash.showMessage(QObject::tr("Opening Dooble."),
-		     Qt::AlignHCenter | Qt::AlignBottom);
-  splash.repaint();
-  dooble::s_application->processEvents();
-  splash.finish(d);
+      while(!d->initialized())
+	splash.repaint();
+
+      splash.showMessage(QObject::tr("Opening Dooble."),
+			 Qt::AlignHCenter | Qt::AlignBottom);
+      splash.repaint();
+      dooble::s_application->processEvents();
+      splash.finish(d);
+    }
+
   QTimer::singleShot(0, d, SLOT(show(void)));
 
   auto rc = dooble::s_application->exec();
