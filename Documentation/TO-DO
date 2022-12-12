@@ -70,6 +70,7 @@ Completed Items
 - Favorites pop-up widget.
 - Favorites search.
 - Filter current site's cookies.
+- Full-screen menu text on Mac is mangled.
 - Full-screen.
 - Fusion alterations.
 - Fusion themes.
@@ -107,6 +108,7 @@ Completed Items
 - Optional Visited Links.
 - Optional credentials.
 - Optional favicons.
+- Optional referrer.
 - Optional testing of Threefish.
 - Pause and resume downloads. Requires Qt support.
 - Pin support windows.
@@ -178,6 +180,7 @@ Completed Items
 - Super-fancy icon set.
 - Support windows as pages and non-Dooble icons.
 - Tab close buttons on the Mac should be on the right.
+- Tab icons are incorrect for east and west. Correct for Qt 6.2.
 - The random-bytes implementation uses a deprecated interface on Windows.
   Replaced with QRandomGenerator.
 - Threefish-256.
@@ -209,11 +212,9 @@ Remaining Items
 - Element-selection option.
 - Fancy completer.
 - Inspect all available URLs when intercepting requests. Content blocking.
-- Optional referrer.
 - Prevent SQL query text overflow.
 - Shortcuts browser.
 - South tab and Mac. Qt-ism?
-- Tab icons are incorrect for east and west. Correct for Qt 6.2.
 - Translation browser.
 
 Unknown Items

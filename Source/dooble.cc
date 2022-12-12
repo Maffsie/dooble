@@ -665,6 +665,11 @@ void dooble::connect_signals(void)
   connect(m_ui.menu_view,
 	  SIGNAL(aboutToShow(void)),
 	  this,
+	  SLOT(slot_about_to_show_view_menu(void)),
+	  Qt::ConnectionType(Qt::QueuedConnection | Qt::UniqueConnection));
+  connect(m_ui.menu_view,
+	  SIGNAL(aboutToShow(void)),
+	  this,
 	  SLOT(slot_about_to_show_main_menu(void)),
 	  Qt::UniqueConnection);
   connect(m_ui.tab,
@@ -1735,9 +1740,8 @@ void dooble::prepare_shortcuts(void)
       m_shortcuts << new QShortcut(QKeySequence(tr("Ctrl+W")),
 				   this,
 				   SLOT(slot_close_tab(void)));
-      m_shortcuts << new QShortcut(QKeySequence(Qt::Key_F11),
-				   this,
-				   SLOT(slot_show_full_screen(void)));
+      m_shortcuts << new QShortcut
+	(QKeySequence(tr("Ctrl+F11")), this, SLOT(slot_show_full_screen(void)));
 
 #ifdef Q_OS_MACOS
       foreach(auto shortcut, m_shortcuts)
@@ -2024,10 +2028,14 @@ void dooble::prepare_standard_menus(void)
   */
 
   menu = m_menu->addMenu(tr("&View"));
+  connect(menu,
+	  SIGNAL(aboutToShow(void)),
+	  this,
+	  SLOT(slot_about_to_show_view_menu(void)));
   m_full_screen_action = menu->addAction(tr("Show &Full Screen"),
 					 this,
 					 SLOT(slot_show_full_screen(void)),
-					 QKeySequence(Qt::Key_F11));
+					 QKeySequence(tr("Ctrl+F11")));
 
   /*
   ** Help Menu
@@ -2699,7 +2707,7 @@ void dooble::slot_about_to_show_tabs_menu(void)
 
       if(i == m_ui.tab->currentIndex())
 	{
-	  QFont font(action->font());
+	  auto font(action->font());
 
 	  font.setBold(true);
 	  action->setFont(font);
@@ -2707,6 +2715,20 @@ void dooble::slot_about_to_show_tabs_menu(void)
     }
 
   QApplication::restoreOverrideCursor();
+}
+
+void dooble::slot_about_to_show_view_menu(void)
+{
+  /*
+  ** Please also review dooble_page.cc.
+  */
+
+#ifdef Q_OS_MACOS
+  auto menu = qobject_cast<QMenu *> (sender());
+
+  if(menu)
+    menu->setMinimumWidth(menu->sizeHint().width() + 25);
+#endif
 }
 
 void dooble::slot_anonymous_tab_headers(bool state)
@@ -4223,7 +4245,7 @@ void dooble::slot_show_release_notes(const QUrl &url)
 void dooble::slot_show_release_notes(void)
 {
   m_ui.tab->setCurrentWidget
-    (new_page(QUrl::fromUserInput("qrc://Documentation/RELEASE-NOTES.html"),
+    (new_page(QUrl::fromUserInput("qrc://Documentation/ReleaseNotes.html"),
 	      m_is_private));
 }
 
@@ -4520,7 +4542,7 @@ void dooble::slot_tabs_menu_button_clicked(void)
 
       if(i == m_ui.tab->currentIndex())
 	{
-	  QFont font(action->font());
+	  auto font(action->font());
 
 	  font.setBold(true);
 	  action->setFont(font);
