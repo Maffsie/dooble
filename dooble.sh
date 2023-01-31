@@ -1,4 +1,5 @@
 #!/usr/bin/env sh
+# Alexis Megas.
 
 export AA_ENABLEHIGHDPISCALING=1
 export AA_USEHIGHDPIPIXMAPS=1
@@ -22,6 +23,17 @@ export QT_X11_NO_MITSHM=1
 if [ -r ./Dooble ] && [ -x ./Dooble ]
 then
     echo "Launching a local Dooble."
+
+    if [ -r ./Lib ]
+    then
+	export LD_LIBRARY_PATH=Lib
+    fi
+
+    if [ -r ./plugins ]
+    then
+	export QT_PLUGIN_PATH=plugins
+    fi
+
     exec ./Dooble "$@"
     exit $?
 elif [ -r /opt/dooble/Dooble ] && [ -x /opt/dooble/Dooble ]
@@ -37,6 +49,6 @@ then
     cd /usr/local/dooble && exec ./Dooble "$@"
     exit $?
 else
-    "Cannot find Dooble."
+    "Cannot find Dooble. Please contact your lovely administrator."
     exit 1
 fi

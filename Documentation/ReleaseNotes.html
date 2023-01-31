@@ -29,6 +29,40 @@
     <title>Dooble Release Notes</title>
     <div class="css">
       <p>
+	<h3><b>Dooble 2023.01.30</b></h3>
+	Welcome to the <b>2023.01.30</b> release of Dooble. Corrections and new features are detailed below.
+	<ul>
+	  <li>Support XDG_CONFIG_HOME. GitHub ticket #151.</li>
+	</ul>
+      </p>
+      <p>
+	<h3><b>Dooble 2023.01.25</b></h3>
+	Welcome to the <b>2023.01.25</b> release of Dooble. Corrections and new features are detailed below.
+	<ul>
+	  <li>Include official Web site in About. GitHub ticket #150.</li>
+	</ul>
+      </p>
+      <p>
+	<h3><b>Dooble 2023.01.18</b></h3>
+	Welcome to the <b>2023.01.18</b> release of Dooble. Corrections and new features are detailed below.
+	<ul>
+	  <li>Do not save private session tabs. GitHub ticket #146.</li>
+	  <li>Dooble profiles through the DOOBLE_HOME environment variable. GitHub ticket #149.</li>
+	  <li>Finicky QFont and empty strings. Some corrections.</li>
+	  <li>Swiftly download version information and display it in About.</li>
+	</ul>
+      </p>
+      <p>
+	<h3><b>Dooble 2023.01.13</b></h3>
+	Welcome to the <b>2023.01.13</b> release of Dooble. Corrections and new features are detailed below.
+	<ul>
+	  <li>New setting: Retain Session Tabs. See Settings -> History. GitHub ticket #146.</li>
+	  <li>Special parsing of address text via Control keyboard modifier. GitHub ticket #147.</li>
+	  <li>Spooky Friday!</li>
+	  <li>memzero() key information.</li>
+	</ul>
+      </p>
+      <p>
 	<h3><b>Dooble 2022.12.25</b></h3>
 	Welcome to the <b>2022.12.25</b> release of Dooble. Corrections and new features are detailed below.
 	<ul>
@@ -50,7 +84,7 @@
 	  <li>Preserve preferred search engine. Problem caused by wayward QStandardItemModel::itemChanged() signal.</li>
 	  <li>Show hovered links in special label near the status bar if the status bar is invisible.</li>
 	  <li>Show new pages after, not before, they're attached to tabs.</li>
-	  <li>Single Gopher object. Qt does not tolerate multiple Gopher objects as a Profile only allows for one object. Gopher searches may surface glitches.</li>
+	  <li>Single Gopher object. The Gopher object will be assigned to all profiles, including private profiles. Qt does not tolerate multiple Gopher objects as a Profile only allows for one object. Gopher searches may surface glitches.</li>
 	  <li>Tab icons are not properly shown for east and west tab orientations and Qt 5. Assume default Qt implementations instead.</li>
 	  <li>The shortcut F11 is now Control + F11.</li>
 	</ul>

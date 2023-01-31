@@ -119,6 +119,48 @@ QList<QAction *> dooble_history::last_n_actions(int n) const
   return list;
 }
 
+QList<QUrl> dooble_history::previous_session_tabs(void) const
+{
+  QList<QUrl> list;
+
+  if(!dooble::s_cryptography)
+    return list;
+
+  auto database_name(dooble_database_utilities::database_name());
+
+  {
+    auto db = QSqlDatabase::addDatabase("QSQLITE", database_name);
+
+    db.setDatabaseName(dooble_settings::setting("home_path").toString() +
+		       QDir::separator() +
+		       "dooble_history.db");
+
+    if(db.open())
+      {
+	QSqlQuery query(db);
+
+	if(query.exec("SELECT url FROM dooble_previous_session_tabs"))
+	  while(query.next())
+	    {
+	      auto bytes(QByteArray::fromBase64(query.value(0).toByteArray()));
+	      auto url(QUrl::
+		       fromEncoded(dooble::
+				   s_cryptography->mac_then_decrypt(bytes)));
+
+	      if(!url.isEmpty() && url.isValid())
+		list << url;
+	    }
+
+	query.exec("DELETE FROM dooble_previous_session_tabs");
+      }
+
+    db.close();
+  }
+
+  QSqlDatabase::removeDatabase(database_name);
+  return list;
+}
+
 QStandardItemModel *dooble_history::favorites_model(void) const
 {
   return m_favorites_model;
@@ -156,6 +198,9 @@ void dooble_history::create_tables(QSqlDatabase &db)
 	     "last_visited TEXT NOT NULL, "
 	     "number_of_visits TEXT NOT NULL, "
 	     "title TEXT NOT NULL, "
+	     "url TEXT NOT NULL, "
+	     "url_digest TEXT PRIMARY KEY NOT NULL)");
+  query.exec("CREATE TABLE IF NOT EXISTS dooble_previous_session_tabs ("
 	     "url TEXT NOT NULL, "
 	     "url_digest TEXT PRIMARY KEY NOT NULL)");
 }
@@ -994,6 +1039,54 @@ void dooble_history::save_item(const QIcon &icon,
   }
 
   QSqlDatabase::removeDatabase(database_name);
+}
+
+void dooble_history::save_session_tabs(const QList<QUrl> &urls)
+{
+  QApplication::setOverrideCursor(QCursor(Qt::WaitCursor));
+
+  auto database_name(dooble_database_utilities::database_name());
+
+  {
+    auto db = QSqlDatabase::addDatabase("QSQLITE", database_name);
+
+    db.setDatabaseName(dooble_settings::setting("home_path").toString() +
+		       QDir::separator() +
+		       "dooble_history.db");
+
+    if(db.open())
+      {
+	create_tables(db);
+
+	QSqlQuery query(db);
+
+	query.exec("PRAGMA synchronous = OFF");
+	query.exec("DELETE FROM dooble_previous_session_tabs");
+
+	if(dooble::s_cryptography &&
+	   dooble_settings::setting("retain_session_tabs").toBool())
+	  {
+	    foreach(const auto &url, urls)
+	      if(!url.isEmpty() && url.isValid())
+		{
+		  query.prepare
+		    ("INSERT INTO dooble_previous_session_tabs "
+		     "(url, url_digest) VALUES (?, ?)");
+		  query.addBindValue
+		    (dooble::s_cryptography->encrypt_then_mac(url.toEncoded()).
+		     toBase64());
+		  query.addBindValue
+		    (dooble::s_cryptography->hmac(url.toEncoded()).toBase64());
+		  query.exec();
+		}
+	  }
+      }
+
+    db.close();
+  }
+
+  QSqlDatabase::removeDatabase(database_name);
+  QApplication::restoreOverrideCursor();
 }
 
 void dooble_history::slot_populate(void)

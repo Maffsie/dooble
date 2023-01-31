@@ -136,6 +136,7 @@ class dooble: public QMainWindow
   QList<QPointer<QAction> > m_standard_menu_actions;
   QList<QShortcut *> m_shortcuts;
   QList<QShortcut *> m_tab_widget_shortcuts;
+  QList<QUrl> all_open_tab_urls(void) const;
   QMenu *m_menu;
   QPointer<QAction> m_action_close_tab;
   QPointer<QAction> m_authentication_action;
@@ -226,6 +227,7 @@ class dooble: public QMainWindow
   void slot_open_link_in_new_tab(const QUrl &url);
   void slot_open_link_in_new_window(const QUrl &url);
   void slot_open_local_file(void);
+  void slot_open_previous_session_tabs(void);
   void slot_open_tab_as_new_private_window(int index);
   void slot_open_tab_as_new_window(int index);
   void slot_pbkdf2_future_finished(void);

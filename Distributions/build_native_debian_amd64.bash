@@ -24,8 +24,6 @@ qmake -o Makefile dooble.pro && make -j $(nproc)
 cp -p ./Documentation/Documents/*.pdf ./opt/dooble/Documentation/.
 cp -p ./Documentation/KDE ./opt/dooble/Documentation/.
 cp -p ./Documentation/TO-DO ./opt/dooble/Documentation/.
-cp -p ./Documentation/dooble.asc ./opt/dooble/Documentation/.
-cp -p ./Documentation/dooble.pol ./opt/dooble/Documentation/.
 cp -p ./Dooble ./opt/dooble/.
 cp -p ./Icons/Logo/dooble.png ./opt/dooble/.
 cp -p ./Translations/*.qm ./opt/dooble/Translations/.
@@ -41,7 +39,7 @@ cp -pr DEBIAN-NATIVE dooble-debian.d/DEBIAN
 cp -r ./opt/dooble dooble-debian.d/opt/.
 cp Icons/Logo/dooble.png dooble-debian.d/usr/share/pixmaps/.
 cp dooble.sh dooble-debian.d/usr/bin/dooble
-fakeroot dpkg-deb --build dooble-debian.d Dooble-2022.12.25_native_amd64.deb
+fakeroot dpkg-deb --build dooble-debian.d Dooble-0000.00.00_native_amd64.deb
 make distclean
 rm -fr ./opt
 rm -fr dooble-debian.d

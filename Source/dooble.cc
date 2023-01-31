@@ -306,6 +306,30 @@ dooble::~dooble()
     m_downloads->abort();
 }
 
+QList<QUrl> dooble::all_open_tab_urls(void) const
+{
+  QApplication::setOverrideCursor(QCursor(Qt::WaitCursor));
+
+  QList<QUrl> list;
+
+  foreach(auto w, QApplication::topLevelWidgets())
+    {
+      auto d = qobject_cast<dooble *> (w);
+
+      if(d && d->m_is_private == false)
+	for(int i = 0; i < d->m_ui.tab->count(); i++)
+	  {
+	    auto page = qobject_cast<dooble_page *> (d->m_ui.tab->widget(i));
+
+	    if(page)
+	      list << page->url();
+	  }
+    }
+
+  QApplication::restoreOverrideCursor();
+  return list;
+}
+
 QStringList dooble::chart_names(void) const
 {
   QStringList list;
@@ -3292,6 +3316,8 @@ void dooble::slot_dooble_credentials_authenticated(bool state)
     {
       if(m_authentication_action)
 	m_authentication_action->setEnabled(false);
+
+      slot_open_previous_session_tabs();
     }
   else
     {
@@ -3574,6 +3600,13 @@ void dooble::slot_open_local_file(void)
   QApplication::processEvents();
 }
 
+void dooble::slot_open_previous_session_tabs(void)
+{
+  foreach(const auto &url, dooble::s_history->previous_session_tabs())
+    if(!url.isEmpty() && url.isValid())
+      slot_open_link(url);
+}
+
 void dooble::slot_open_tab_as_new_private_window(int index)
 {
   open_tab_as_new_window(true, index);
@@ -3787,6 +3820,9 @@ void dooble::slot_quit_dooble(void)
   s_cookies_window->close();
   s_downloads->abort();
   s_history->abort();
+  s_history->save_session_tabs
+    (dooble_settings::setting("retain_session_tabs", false).toBool() ?
+     all_open_tab_urls() : QList<QUrl> ());
   s_history_popup->deleteLater();
   QApplication::exit(0);
 }
